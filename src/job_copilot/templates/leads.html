@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="card stack">
+  <div class="row" style="justify-content:space-between">
+    <h1>Discovered jobs</h1>
+    <div class="row small">
+      {% for s, label in [('queued','waiting to be scored'),('assessed','scored'),('filtered','filtered out'),('too_short','too little text'),('','all')] %}
+      <a class="btn {{ '' if state == s else 'ghost' }}" href="/leads?state={{ s }}">{{ label }}{% if s and counts.get(s) %} ({{ counts[s] }}){% endif %}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <p class="muted small">The agent checks Remotive, Himalayas (worldwide + South Africa), RemoteOK and your company watchlist every morning. A free filter on title and location decides what's worth an AI score; the reason is shown for every job.</p>
+  <div class="tbl"><table>
+    <tr><th>Match</th><th>Job</th><th>Location</th><th>Why</th><th>Status</th></tr>
+    {% for l in leads %}
+    <tr>
+      <td>{{ l.score or '' }}</td>
+      <td><a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.title }}</a><br><span class="muted small">{{ l.company }} · {{ l.source }} · found {{ l.found_at[:10] }}</span></td>
+      <td class="small">{{ l.location[:60] }}</td>
+      <td class="small">{{ l.reason }}</td>
+      <td class="small">{% if l.job_id %}<a href="/jobs/{{ l.job_id }}">scored →</a>{% else %}{{ l.state }}{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">Nothing here yet.</td></tr>{% endfor %}
+  </table></div>
+</section>
+
+<section class="card" style="margin-top:16px">
+  <h2>Recent runs</h2>
+  <div class="tbl"><table>
+    <tr><th>Started (UTC)</th><th>Trigger</th><th>Checked</th><th>New matches</th><th>Scored</th><th>Docs</th><th>Cost</th><th>Note</th></tr>
+    {% for r in runs %}{% set rep = r.report or {} %}
+    <tr class="small"><td>{{ r.started[:16].replace('T',' ') }}</td><td>{{ r.trigger }}</td><td>{{ rep.found }}</td><td>{{ rep.new_matches }}</td>
+      <td>{{ (rep.assessed or [])|length }}</td><td>{{ (rep.docs or [])|length }}</td><td>{% if rep.spent_usd is not none %}${{ '%.2f'|format(rep.spent_usd) }}{% endif %}</td>
+      <td>{{ rep.stopped or ('running…' if not r.finished else '') }}{% for k, v in (rep.sources or {}).items() %}{% if v.startswith('error') %} · {{ k }} {{ v }}{% endif %}{% endfor %}</td></tr>
+    {% else %}<tr><td colspan="8" class="muted">No runs yet.</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endblock %}

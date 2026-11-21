@@ -35,8 +35,10 @@ details summary{cursor:pointer;font-weight:600}pre{white-space:pre-wrap;font:13p
   <nav>
     <a href="/" class="{{ 'on' if path == '/' }}">Dashboard</a>
     <a href="/jobs" class="{{ 'on' if path.startswith('/jobs') }}">Jobs</a>
+    <a href="/leads" class="{{ 'on' if path == '/leads' }}">Discovered</a>
     <a href="/history" class="{{ 'on' if path == '/history' }}">History</a>
     <a href="/profile" class="{{ 'on' if path == '/profile' }}">Profile</a>
+    <a href="/settings" class="{{ 'on' if path == '/settings' }}">Settings</a>
   </nav>
   <span class="spend" title="AI spend this month">AI spend: ${{ '%.2f'|format(spent) }} / ${{ '%.0f'|format(budget) }}</span>
   <form method="post" action="/logout"><button class="ghost">Log out</button></form>

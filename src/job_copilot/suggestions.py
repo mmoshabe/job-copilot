@@ -43,15 +43,15 @@ def suggestions(t: Tracker, today: date | None = None, stale_days: int = 21) -> 
     out: list[Suggestion] = []
     jobs = t.list()
     if not jobs:
-        return [Suggestion("start", 1, "Add your first job post: paste a Greenhouse/Lever link or the job text.")]
+        return [Suggestion("start", 2, "No jobs scored yet. The agent scores the best discovered matches on its next morning run (or click Run now).")]
     for j in t.due(today):
         out.append(Suggestion("follow_up", 1, f"Follow up with {j.company} about {j.title} (applied {j.applied_on}).", j.id))
     for j in jobs:
         if j.status == "new" and j.recommendation == "apply":
             if not j.has_resume:
-                out.append(Suggestion("resume", 2, f"Strong fit ({j.score}/100): tailor your resume for {j.title} at {j.company}.", j.id))
+                out.append(Suggestion("resume", 2, f"Strong fit ({j.score}/100): {j.title} at {j.company}. The agent writes your resume + letter on its next run.", j.id))
             elif not j.has_letter:
-                out.append(Suggestion("letter", 2, f"Write the cover letter for {j.title} at {j.company}, then apply.", j.id))
+                out.append(Suggestion("letter", 2, f"{j.title} at {j.company}: resume ready, letter comes on the next run.", j.id))
             else:
                 out.append(Suggestion("apply", 1, f"Resume and letter ready: apply to {j.title} at {j.company} and mark it applied.", j.id))
         elif j.status == "new" and j.recommendation == "stretch":

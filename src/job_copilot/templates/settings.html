@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block body %}
+<p class="muted">Optional. The agent already runs with defaults based on your portfolio ("Technical Support & Integration Engineer, open to remote roles"). Change these only if you want to steer it.</p>
+<form method="post" action="/settings" class="stack">
+  <div class="grid">
+    <section class="card stack">
+      <h2>What to look for</h2>
+      {% for k, label in [('titles','Target job titles (one per line)'),('exclude_titles','Skip titles containing'),('locations_ok','Locations you can work from'),('locations_block','Location restrictions to skip')] %}
+        <label class="small"><b>{{ label }}</b><textarea name="{{ k }}">{{ cfg[k]|join('\n') }}</textarea></label>
+      {% endfor %}
+    </section>
+    <section class="card stack">
+      <h2>Where to look</h2>
+      <label class="small"><b>Company watchlist: Greenhouse boards</b> <span class="muted">(the name in boards.greenhouse.io/<i>name</i>)</span><textarea name="greenhouse_boards" style="min-height:70px">{{ cfg.greenhouse_boards|join('\n') }}</textarea></label>
+      <label class="small"><b>Company watchlist: Lever</b> <span class="muted">(the name in jobs.lever.co/<i>name</i>)</span><textarea name="lever_companies" style="min-height:70px">{{ cfg.lever_companies|join('\n') }}</textarea></label>
+      <label class="small"><b>Himalayas searches</b><textarea name="himalayas_queries" style="min-height:70px">{{ cfg.himalayas_queries|join('\n') }}</textarea></label>
+      <label class="small"><b>Remotive categories</b><textarea name="remotive_categories" style="min-height:50px">{{ cfg.remotive_categories|join('\n') }}</textarea></label>
+      <label class="small"><b>Skills that raise the match</b><textarea name="skills">{{ cfg.skills|join('\n') }}</textarea></label>
+      <h2>Budget</h2>
+      <label class="small"><b>Max AI spend per daily run (USD)</b><input name="run_budget_usd" value="{{ cfg.run_budget_usd }}"></label>
+      <label class="small"><b>Jobs scored per run</b><input name="assess_per_run" value="{{ cfg.assess_per_run }}"></label>
+      <label class="small"><b>Auto-write resume + letter at fit score ≥</b><input name="auto_docs_min_score" value="{{ cfg.auto_docs_min_score }}"></label>
+      <label class="small"><b>Minimum free-filter match to score</b><input name="min_prefilter_score" value="{{ cfg.min_prefilter_score }}"></label>
+      <p class="muted small">Hard monthly cap: ${{ '%.0f'|format(budget) }} (set in Vercel as JOBS_MONTHLY_BUDGET_USD). Runs stop when it's reached.</p>
+    </section>
+  </div>
+  <div class="row"><button>Save</button><button class="ghost" name="reset" value="1">Reset to defaults</button></div>
+</form>
+{% endblock %}

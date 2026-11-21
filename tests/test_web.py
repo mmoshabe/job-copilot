@@ -78,3 +78,37 @@ def test_profile_portfolio_not_editable(client):
     login(client)
     r = client.post("/profile", data={"key": "portfolio", "value": "fake"}, follow_redirects=False)
     assert "err=" in r.headers["location"]
+
+
+def test_cron_requires_secret(client, monkeypatch):
+    monkeypatch.setenv("CRON_SECRET", "cron-s3cret")
+    assert client.get("/cron/run").status_code == 401
+    assert client.get("/cron/run", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    monkeypatch.setattr(web.automation, "run", lambda c, trigger: {"found": 0, "new_matches": 0, "assessed": [],
+                                                                    "docs": [], "stopped": None, "spent_usd": 0.0})
+    r = client.get("/cron/run", headers={"Authorization": "Bearer cron-s3cret"})
+    assert r.status_code == 200 and r.json()["found"] == 0
+
+
+def test_agent_pages_render(client, monkeypatch):
+    login(client)
+    monkeypatch.setattr(web.automation, "discover",
+                        lambda cfg, client=None: ([], {"remotive": "0 found"}))
+    monkeypatch.setattr(web.automation, "fetch_portfolio", lambda url: {})
+    import job_copilot.automation as auto
+    r = client.post("/run", follow_redirects=False)
+    assert "Run+done" in r.headers["location"] or "Run done" in r.headers["location"]
+    for path in ("/", "/leads", "/leads?state=", "/settings"):
+        assert client.get(path).status_code == 200, path
+    assert "Your job agent" in client.get("/").text
+
+
+def test_settings_save_and_validate(client):
+    login(client)
+    form = {k: "" for k in web._LISTS} | {"titles": "support engineer\nai engineer", "assess_per_run": "3",
+                                         "run_budget_usd": "0.2", "auto_docs_min_score": "80", "min_prefilter_score": "3"}
+    client.post("/settings", data=form)
+    cfg = web.automation.config(web.copilot())
+    assert cfg.titles == ["support engineer", "ai engineer"] and cfg.assess_per_run == 3
+    bad = client.post("/settings", data=form | {"run_budget_usd": "99"}, follow_redirects=False)
+    assert "err=" in bad.headers["location"]

@@ -6,8 +6,12 @@ and letters can draw on it -- and the fact-checker checks against it."""
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
+
+import httpx
+import json5
 
 _EXPORT = ("import(process.argv[1]).then(m => console.log(JSON.stringify("
            "{site: m.site, experience: m.experience, work: m.work, credentials: m.credentials, "
@@ -50,3 +54,48 @@ def evidence(cv: str, portfolio_md: str | None = None, projects_md: str | None =
     if projects_md:
         parts.append(f"<projects>\n{projects_md}\n</projects>")
     return "\n\n".join(parts)
+
+
+_WANTED = ("site", "experience", "work", "credentials", "sides", "stats")
+
+
+def _literal_end(src: str, start: int) -> int:
+    """Index just past the object/array literal starting at src[start], skipping strings and comments."""
+    depth, i, quote = 0, start, None
+    while i < len(src):
+        ch = src[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+        elif ch in "\"'`":
+            quote = ch
+        elif src.startswith("//", i):
+            i = src.index("\n", i)
+            continue
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    raise ValueError("unterminated literal")
+
+
+def parse_data_ts(src: str) -> dict:
+    """Parse `export const name = {...}` / `[...]` literals without Node (used on the server)."""
+    out = {}
+    for m in re.finditer(r"^export const (\w+)(?:\s*:[^=]+)?\s*=\s*", src, re.M):
+        name, start = m.group(1), m.end()
+        if name in _WANTED and src[start] in "[{":
+            out[name] = json5.loads(src[start:_literal_end(src, start)])
+    return out
+
+
+def fetch_portfolio(url: str) -> dict:
+    r = httpx.get(url, timeout=20, follow_redirects=True)
+    r.raise_for_status()
+    return parse_data_ts(r.text)

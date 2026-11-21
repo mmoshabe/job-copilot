@@ -34,6 +34,11 @@ def _tables(pg: bool) -> list[str]:
         """CREATE TABLE IF NOT EXISTS profile (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)""",
         f"""CREATE TABLE IF NOT EXISTS llm_usage (
             id {pk}, action TEXT, model TEXT, job_id INTEGER, cost_usd REAL, at TEXT)""",
+        f"""CREATE TABLE IF NOT EXISTS leads (
+            id {pk}, source TEXT, title TEXT, company TEXT, location TEXT, url TEXT UNIQUE, text TEXT,
+            posted TEXT, score REAL, keep INTEGER, reason TEXT, state TEXT, job_id INTEGER, found_at TEXT)""",
+        f"""CREATE TABLE IF NOT EXISTS runs (
+            id {pk}, started TEXT, finished TEXT, trigger TEXT, report TEXT)""",
     ]
 
 
@@ -240,3 +245,56 @@ class Tracker:
         if spent >= monthly_budget_usd:
             raise BudgetExceeded(f"Monthly AI budget reached (${spent:.2f} of ${monthly_budget_usd:.2f}). "
                                  "Raise JOBS_MONTHLY_BUDGET_USD to continue.")
+
+    # -- discovery: leads and runs ----------------------------------------------------------
+
+    def known_url(self, url: str) -> bool:
+        return bool(self._x("SELECT 1 FROM leads WHERE url = ?", (url,)).fetchone()
+                    or self._x("SELECT 1 FROM jobs WHERE url = ?", (url,)).fetchone())
+
+    def add_lead(self, lead) -> bool:
+        """Store a discovered lead once (by URL). Returns True if it was new."""
+        if not lead.url or self.known_url(lead.url):
+            return False
+        self._x("INSERT INTO leads (source, title, company, location, url, text, posted, score, keep, reason, state, found_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (lead.source, lead.title, lead.company, lead.location, lead.url, lead.text, lead.posted, lead.score,
+                 1 if lead.keep else 0, lead.reason, "queued" if lead.keep else "filtered", _now()))
+        return True
+
+    def queued_leads(self, limit: int) -> list[dict]:
+        rows = self._x("SELECT id, title, company, url, text, score FROM leads WHERE state = 'queued' "
+                       "ORDER BY score DESC, id LIMIT ?", (limit,)).fetchall()
+        return [dict(zip(("id", "title", "company", "url", "text", "score"), r)) for r in rows]
+
+    def mark_lead(self, lead_id: int, state: str, job_id: int | None = None) -> None:
+        self._x("UPDATE leads SET state = ?, job_id = ? WHERE id = ?", (state, job_id, lead_id))
+
+    def leads(self, state: str | None = None, limit: int = 300) -> list[dict]:
+        q, p = "SELECT id, source, title, company, location, url, score, reason, state, job_id, found_at FROM leads", ()
+        if state:
+            q, p = q + " WHERE state = ?", (state,)
+        rows = self._x(q + f" ORDER BY id DESC LIMIT {int(limit)}", p).fetchall()
+        return [dict(zip(("id", "source", "title", "company", "location", "url", "score", "reason", "state", "job_id",
+                          "found_at"), r)) for r in rows]
+
+    def lead_counts(self) -> dict[str, int]:
+        return {k: v for k, v in self._x("SELECT state, COUNT(*) FROM leads GROUP BY state").fetchall()}
+
+    def start_run(self, trigger: str) -> int | None:
+        """Returns a run id, or None if another run started in the last 10 minutes (no double spend)."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(timespec="seconds")
+        if self._x("SELECT 1 FROM runs WHERE finished IS NULL AND started > ?", (cutoff,)).fetchone():
+            return None
+        return self._x("INSERT INTO runs (started, trigger) VALUES (?, ?) RETURNING id", (_now(), trigger)).fetchone()[0]
+
+    def finish_run(self, run_id: int, report: dict) -> None:
+        self._x("UPDATE runs SET finished = ?, report = ? WHERE id = ?", (_now(), json.dumps(report), run_id))
+
+    def runs(self, limit: int = 20) -> list[dict]:
+        rows = self._x(f"SELECT id, started, finished, trigger, report FROM runs ORDER BY id DESC LIMIT {int(limit)}").fetchall()
+        return [{"id": r[0], "started": r[1], "finished": r[2], "trigger": r[3],
+                 "report": json.loads(r[4]) if r[4] else None} for r in rows]
+
+    def spend_since(self, iso: str) -> float:
+        return float(self._x("SELECT COALESCE(SUM(cost_usd), 0) FROM llm_usage WHERE at >= ?", (iso,)).fetchone()[0])

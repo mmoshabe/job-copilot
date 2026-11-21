@@ -1,8 +1,21 @@
 {% extends "base.html" %}
 {% block body %}
-<div class="grid">
+<section class="card stack">
+  <div class="row" style="justify-content:space-between">
+    <h2 style="margin:0">🤖 Your job agent</h2>
+    <form method="post" action="/run" data-slow="Running (up to 4 minutes)…"><button class="ghost">Run now</button></form>
+  </div>
+  <p class="muted small" style="margin:0">Runs every morning by itself: finds jobs, scores the best matches against your CV + portfolio, writes a fact-checked resume and letter for strong ones (fit ≥ {{ cfg.auto_docs_min_score }}), then lists what needs you. Max ${{ '%.2f'|format(cfg.run_budget_usd) }} per run, ${{ '%.0f'|format(budget) }} per month.</p>
+  {% if last_run and last_run.report %}
+    <div class="doc" style="white-space:pre-wrap">{{ last_run.report.digest }}</div>
+    <div class="muted small">Last run {{ last_run.started[:16].replace('T',' ') }} UTC ({{ last_run.trigger }}) · <a href="/leads">{{ lead_counts.get('queued', 0) }} jobs queued, {{ lead_counts.get('assessed', 0) }} scored, {{ lead_counts.get('filtered', 0) }} filtered out →</a></div>
+  {% elif last_run %}<p>Run in progress, started {{ last_run.started[:16].replace('T',' ') }} UTC.</p>
+  {% else %}<p>No run yet: the first one happens tomorrow morning, or click <b>Run now</b>.</p>{% endif %}
+</section>
+
+<div class="grid" style="margin-top:16px">
   <section class="card stack">
-    <h2>Add a job</h2>
+    <h2>Add a job yourself <span class="muted small">(optional)</span></h2>
     <form method="post" action="/jobs" class="stack" data-slow="Scoring against your CV…">
       <input name="url" placeholder="Job link (Greenhouse / Lever / company careers page)">
       <textarea name="text" placeholder="…or paste the job text (needed for LinkedIn / Indeed). Add the link above too, to keep it."></textarea>

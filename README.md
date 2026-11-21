@@ -11,6 +11,20 @@ jobs status 1 applied                                       # follow-up reminder
 jobs due                                                    # what needs chasing today
 ```
 
+## Daily agent (runs by itself)
+
+Every morning at 06:00 SAST (Vercel Cron), with no clicks needed:
+
+1. **Refreshes your evidence** from your portfolio repo (`lib/data.ts` on GitHub; parsed in Python, no Node needed).
+2. **Finds jobs** from free APIs built for this: Remotive, Himalayas (worldwide + South Africa scopes), RemoteOK, plus any Greenhouse/Lever companies on your watchlist.
+3. **Filters for free** on target titles and reachable locations, recording a reason for every job (e.g. "location: United States", "matches integration engineer; skills: api, sql").
+4. **Writes a fact-checked tailored resume and cover letter for strong matches first** (fit ≥ 75), then **scores the best new leads** with the remaining budget.
+5. **Posts a digest** on the dashboard (and to Slack if `JOBS_SLACK_WEBHOOK_URL` is set): what's new, what's ready to send, and your to-do list.
+
+It's bounded by a per-run budget (default $0.35), the monthly cap, a time limit (it continues the queue the next day) and a lock against overlapping runs. The one step left to you is pressing submit on the employer's application form.
+
+First production run (budget set to $0 to test the plumbing): 223 jobs checked, 38 matches queued, 185 filtered out with reasons, $0.00 spent.
+
 ## Web dashboard
 
 A private dashboard (password login) runs on Vercel with Neon Postgres, on free tiers:

@@ -30,5 +30,7 @@ class Settings:
     max_letter_revisions: int = 2
     database_url: str | None = field(default_factory=lambda: os.environ.get("DATABASE_URL"))
     monthly_budget_usd: float = field(default_factory=lambda: float(os.environ.get("JOBS_MONTHLY_BUDGET_USD", "5")))
+    portfolio_url: str = field(default_factory=lambda: os.environ.get(
+        "JOBS_PORTFOLIO_URL", "https://raw.githubusercontent.com/mmoshabe/portfolio/main/lib/data.ts"))
     portfolio_data: Path = field(default_factory=lambda: Path(os.environ.get(
         "JOBS_PORTFOLIO_DATA", str(PROJECT_ROOT.parent.parent / "portfolio" / "lib" / "data.ts"))))

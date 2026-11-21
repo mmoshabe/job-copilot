@@ -27,13 +27,15 @@ from .service import Copilot, NoProfile
 from .sources import SourceError
 from .suggestions import skill_gaps, suggestions
 from .tracker import STATUSES, BudgetExceeded
+from . import automation
+from .discovery import AutomationConfig
 
 app = FastAPI(title="Job Copilot", docs_url=None, redoc_url=None, openapi_url=None)
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.filters["md"] = lambda s: md.markdown(s or "", extensions=["sane_lists"])
 COOKIE = "jc_session"
 SESSION_SECONDS = 14 * 24 * 3600
-PUBLIC = {"/login", "/health"}
+PUBLIC = {"/login", "/health", "/cron/run"}  # /cron/run checks CRON_SECRET itself
 
 
 @lru_cache
@@ -116,9 +118,11 @@ def home(request: Request):
     t = copilot().t
     jobs = t.list()
     counts = {s: sum(j.status == s for j in jobs) for s in STATUSES}
+    runs = t.runs(1)
     return templates.TemplateResponse(request, "home.html", _base(
         request, counts=counts, total=len(jobs), suggestions=suggestions(t)[:8], gaps=skill_gaps(t),
-        due=t.due(), events=t.events(limit=12), top=[j for j in jobs if j.status == "new"][:5]))
+        due=t.due(), events=t.events(limit=12), top=[j for j in jobs if j.status == "new"][:5],
+        last_run=runs[0] if runs else None, lead_counts=t.lead_counts(), cfg=automation.config(copilot())))
 
 
 @app.get("/jobs", response_class=HTMLResponse)
@@ -233,3 +237,63 @@ def save_profile(key: str = Form(...), value: str = Form(...)):
         return _redirect("/profile", err="Only the CV and project notes are editable here.")
     copilot().t.set_profile(key, value)
     return _redirect("/profile", msg=f"{'CV' if key == 'cv' else 'Project notes'} saved")
+
+
+# -- automation ---------------------------------------------------------------------------
+
+@app.get("/cron/run")
+async def cron_run(request: Request):
+    """Vercel Cron calls this daily with `Authorization: Bearer $CRON_SECRET`."""
+    secret = os.environ.get("CRON_SECRET")
+    supplied = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+    if not secret or not hmac.compare_digest(supplied, secret):
+        return PlainTextResponse("unauthorized", status_code=401)
+    report = await run_in_threadpool(automation.run, copilot(), "cron")
+    return {k: report.get(k) for k in ("skipped", "found", "new_matches", "assessed", "docs", "stopped", "spent_usd")}
+
+
+@app.post("/run")
+async def run_now():
+    report = await run_in_threadpool(automation.run, copilot(), "manual")
+    if report.get("skipped"):
+        return _redirect("/", err=f"Not started: {report['skipped']}")
+    return _redirect("/", msg=f"Run done: {report['new_matches']} new matches, {len(report['assessed'])} scored, "
+                              f"{len(report['docs'])} documents, ${report['spent_usd']:.2f}")
+
+
+@app.get("/leads", response_class=HTMLResponse)
+def leads_page(request: Request, state: str = "queued"):
+    t = copilot().t
+    return templates.TemplateResponse(request, "leads.html", _base(
+        request, leads=t.leads(state or None), state=state, counts=t.lead_counts(), runs=t.runs(10)))
+
+
+_LISTS = ("titles", "exclude_titles", "locations_ok", "locations_block", "skills", "himalayas_queries",
+          "remotive_categories", "greenhouse_boards", "lever_companies")
+_NUMS = {"assess_per_run": int, "run_budget_usd": float, "auto_docs_min_score": int, "min_prefilter_score": float}
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    cfg = automation.config(copilot())
+    return templates.TemplateResponse(request, "settings.html", _base(
+        request, cfg=cfg, lists=_LISTS, nums=_NUMS, defaults=AutomationConfig()))
+
+
+@app.post("/settings")
+async def save_settings(request: Request):
+    form = await request.form()
+    if form.get("reset"):
+        copilot().t.set_profile("automation", "{}")
+        return _redirect("/settings", msg="Back to defaults")
+    d = {k: [x.strip() for x in str(form.get(k, "")).splitlines() if x.strip()] for k in _LISTS}
+    try:
+        d.update({k: cast(form.get(k)) for k, cast in _NUMS.items()})
+    except (TypeError, ValueError):
+        return _redirect("/settings", err="Numbers only in the number fields.")
+    if d["run_budget_usd"] > copilot().s.monthly_budget_usd:
+        return _redirect("/settings", err="Per-run budget can't exceed the monthly cap.")
+    import json as _json
+
+    copilot().t.set_profile("automation", _json.dumps(d))
+    return _redirect("/settings", msg="Saved. The next run uses these settings.")
