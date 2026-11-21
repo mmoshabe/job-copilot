@@ -34,6 +34,11 @@ LEXICON = [
     "machine learning", "automation", "workflow automation", "agile", "scrum", "stakeholder management",
     "customer success", "onboarding", "implementation", "solutions engineering", "pre-sales", "fintech",
     "e-commerce", "logistics", "healthcare", "payments", "security", "compliance", "gdpr", "popia", "soc 2",
+    # business / implementation / operations roles
+    "business analysis", "process improvement", "process mapping", "operations", "workflows", "no-code",
+    "low-code", "ai agents", "ai assistants", "chatbots", "training", "non-technical", "change management",
+    "requirements gathering", "stakeholders", "sops", "client engagements", "small businesses", "nonprofits",
+    "government", "user adoption", "project management", "consulting",
 ]
 
 ALIASES = {
@@ -46,7 +51,19 @@ ALIASES = {
     "integrations": ["integration", "integrations"], "troubleshooting": ["troubleshoot", "troubleshooting", "troubleshot"],
     "sla": ["sla", "slas"], "saas": ["saas"], "on-call": ["on-call", "on call"],
     "incident management": ["incident management", "incidents", "incident"],
+    "workflows": ["workflow", "workflows"], "ai agents": ["ai agent", "ai agents"],
+    "ai assistants": ["ai assistant", "ai assistants"], "chatbots": ["chatbot", "chatbots"],
+    "training": ["training", "trains", "trained", "train"], "non-technical": ["non-technical", "nontechnical"],
+    "documentation": ["documentation", "documented", "documenting", "document"],
+    "sops": ["sop", "sops", "standard operating procedures"], "nonprofits": ["nonprofit", "nonprofits", "non-profit", "npo"],
+    "small businesses": ["small business", "small businesses", "smes", "sme"],
+    "client engagements": ["client engagement", "client engagements"], "process improvement": ["process improvement", "process improvements"],
+    "no-code": ["no-code", "no code", "nocode"], "low-code": ["low-code", "low code"],
+    "government": ["government", "public sector"], "stakeholders": ["stakeholder", "stakeholders"],
 }
+
+# "Make" (the automation tool) vs "make" (the verb): only count it capitalised in a tool-list context.
+_MAKE_TOOL = re.compile(r"(?:[,(/]\s*|\b(?:and|or|in)\s+)Make(?:\.com)?\b|\bMake(?:\.com)?\s*(?:[,)/]|\b(?:or|and)\b)")
 
 _STD_HEADINGS = ("experience", "skills", "education")
 
@@ -56,6 +73,8 @@ def _variants(term: str) -> list[str]:
 
 
 def _has(text: str, term: str) -> bool:
+    if term == "make":
+        return bool(_MAKE_TOOL.search(text) or re.search(r"make\.com|integromat", text, re.I))
     t = text.lower()
     for v in _variants(term):
         if re.search(rf"(?<![\w.+#-]){re.escape(v)}(?![\w+#])", t):
@@ -67,7 +86,10 @@ def keywords(job_text: str, fit: FitAssessment | None = None, limit: int = 25) -
     """Ordered list of {term, must}: lexicon terms in the post (by frequency) + short requirement phrases."""
     counts = Counter()
     for term in LEXICON:
-        n = sum(len(re.findall(rf"(?<![\w.+#-]){re.escape(v)}(?![\w+#])", job_text.lower())) for v in _variants(term))
+        if term == "make":
+            n = len(_MAKE_TOOL.findall(job_text))
+        else:
+            n = sum(len(re.findall(rf"(?<![\w.+#-]){re.escape(v)}(?![\w+#])", job_text.lower())) for v in _variants(term))
         if n:
             counts[term] = n
     must_text = " ".join(r.text for r in (fit.requirements if fit else []) if r.kind is Kind.must).lower()

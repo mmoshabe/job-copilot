@@ -140,3 +140,21 @@ def test_expert_stages_off_by_default_and_on_when_switched(c, monkeypatch):
     c.t.finish_run(c.t.runs()[0]["id"], {})
     r = automation.run(c, "manual", discover_fn=nothing)
     assert r["preps"] and c.t.get_json(j, "prep") and "Interview prep ready" in r["digest"]
+
+
+def test_make_the_tool_vs_make_the_verb():
+    job = "No-code automation (Zapier, Make, n8n or similar). We make clients happy."
+    assert "make" in [k["term"] for k in keywords(job)]
+    assert ats_report("Built workflows in GoHighLevel, HubSpot and Make.", job, "", None)["keywords"]
+    hits = {k["term"]: k["in_resume"] for k in ats_report("Built workflows in HubSpot and Make.", job, "", None)["keywords"]}
+    assert hits["make"] is True
+    assert {k["term"]: k["in_resume"] for k in ats_report("I make things work.", job, "", None)["keywords"]}["make"] is False
+
+
+def test_business_role_keywords():
+    terms = [k["term"] for k in keywords(open("/tmp/jc/job.txt").read())] if __import__("os").path.exists("/tmp/jc/job.txt") else []
+    job = ("Maps and documents workflows, configures AI agents and no-code automations, trains non-technical staff. "
+           "3+ years in business analysis, operations or process improvement.")
+    terms = [k["term"] for k in keywords(job)]
+    assert {"workflows", "ai agents", "no-code", "training", "non-technical", "business analysis", "operations",
+            "process improvement"} <= set(terms)
