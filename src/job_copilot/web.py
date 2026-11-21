@@ -166,7 +166,8 @@ def job_page(request: Request, job_id: int):
     return templates.TemplateResponse(request, "job.html", _base(
         request, j=j, fit=FitAssessment.model_validate(assessment), job_text=job_text, statuses=STATUSES,
         letter=letter, letter_check=letter_check, resume=resume, resume_check=resume_check,
-        events=t.events(job_id)))
+        events=t.events(job_id), ats=t.get_json(job_id, "ats"), panel=t.get_json(job_id, "panel"),
+        prep=t.get_json(job_id, "prep"), cfg=automation.config(copilot())))
 
 
 @app.post("/jobs/{job_id}/status")
@@ -191,13 +192,19 @@ def snooze(job_id: int, days: int = Form(7)):
 
 @app.post("/jobs/{job_id}/{kind}")
 async def generate(job_id: int, kind: str):
-    if kind not in ("letter", "resume"):
+    if kind not in ("letter", "resume", "review", "prep"):
         return PlainTextResponse("not found", status_code=404)
     c = copilot()
+    fn = {"letter": c.letter, "resume": c.resume, "review": c.review, "prep": c.prep}[kind]
     try:
-        res = await run_in_threadpool(c.letter if kind == "letter" else c.resume, job_id)
+        res = await run_in_threadpool(fn, job_id)
     except (NoProfile, BudgetExceeded, LLMError) as e:
         return _redirect(f"/jobs/{job_id}", err=str(e))
+    if kind == "review":
+        return _redirect(f"/jobs/{job_id}#panel", msg=f"Panel review done; ATS {res['ats_before']}→{res['ats_after']}; "
+                                                       f"revised {', '.join(res['revised']) or 'nothing'} (cost ${res['cost_usd']:.2f})")
+    if kind == "prep":
+        return _redirect(f"/jobs/{job_id}#prep", msg=f"Interview pack ready: {len(res['questions'])} questions (cost ${res['cost_usd']:.2f})")
     note = "fact-check passed" if res.grounded else f"{len(res.check.unsupported_claims)} unsupported claim(s): edit before sending"
     return _redirect(f"/jobs/{job_id}#{kind}", msg=f"{kind.title()} ready: {note} (cost ${res.cost_usd:.3f})")
 
@@ -291,9 +298,13 @@ async def save_settings(request: Request):
         d.update({k: cast(form.get(k)) for k, cast in _NUMS.items()})
     except (TypeError, ValueError):
         return _redirect("/settings", err="Numbers only in the number fields.")
+    d["expert_mode"] = form.get("expert_mode") == "on"
     if d["run_budget_usd"] > copilot().s.monthly_budget_usd:
         return _redirect("/settings", err="Per-run budget can't exceed the monthly cap.")
     import json as _json
 
     copilot().t.set_profile("automation", _json.dumps(d))
-    return _redirect("/settings", msg="Saved. The next run uses these settings.")
+    msg = "Saved. The next run uses these settings."
+    if d["expert_mode"] and d["run_budget_usd"] < 0.75:
+        msg += " Note: expert mode needs about $0.75 per run to fit a panel review; at this budget it will do less."
+    return _redirect("/settings", msg=msg)

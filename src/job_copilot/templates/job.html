@@ -74,6 +74,64 @@
 </section>
 {% endif %}
 
+{% set labels = {'recruiter': '🔎 Recruiter', 'hiring_manager': '🛠 Hiring manager', 'business_owner': '💼 Business owner', 'applicant': '🙋 You (applicant)', } %}
+<section class="card stack" id="ats" style="margin-top:16px">
+  <div class="row" style="justify-content:space-between"><h2>ATS check <span class="muted small">(free, automatic on every resume)</span></h2>
+    {% if ats %}<span class="pill {{ 'apply' if ats.score >= 75 else ('stretch' if ats.score >= 55 else 'skip') }}" style="font-size:15px">{{ ats.score }}/100</span>{% endif %}</div>
+  {% if ats %}
+    <p class="small">Keyword match <b>{{ ats.keyword_coverage }}%</b> · best you can honestly reach with your evidence <b>{{ ats.honest_ceiling }}%</b></p>
+    <div class="grid">
+      <div><h3>Keywords</h3><p class="small">{% for k in ats.keywords %}<span class="pill {{ 'apply' if k.in_resume else ('stretch' if k.in_evidence else 'skip') }}" style="margin:2px">{{ k.term }}{{ '*' if k.must }}</span> {% endfor %}</p>
+        <p class="muted small">Green: in the resume · Amber: you have it, add it · Red: a real gap, never added · * must-have</p></div>
+      <div><h3>Format</h3><ul class="clean small">{% for c in ats.format %}<li>{{ '✅' if c.ok else '⚠️' }} {{ c.check }} <span class="muted">· {{ c.detail }}</span></li>{% endfor %}</ul></div>
+    </div>
+  {% else %}<p class="muted">Appears once a tailored resume exists.</p>{% endif %}
+</section>
+
+<section class="card stack" id="panel" style="margin-top:16px">
+  <div class="row" style="justify-content:space-between">
+    <h2>Panel review <span class="muted small">(4 perspectives)</span></h2>
+    <form method="post" action="/jobs/{{ j.id }}/review" data-slow="Panel reviewing and improving (1-2 min)…"><button class="ghost">{{ 'Re-run' if panel else 'Run' }} panel review · ~$0.50</button></form>
+  </div>
+  {% if panel %}
+    <p>{{ panel.summary }} <span class="muted small">· ATS {{ panel.ats_before }}→{{ panel.ats_after }} · revised {{ panel.revised|join(', ') or 'nothing' }} · instructions v{{ panel.instructions_version }}</span></p>
+    {% for f in panel.red_flags %}<p class="warnbox">⛔ {{ f }}</p>{% endfor %}
+    <div class="grid">
+      {% for p in panel.perspectives %}
+      <div class="doc"><div class="row" style="justify-content:space-between"><b>{{ labels.get(p.perspective, p.perspective) }}</b><span class="pill {{ 'apply' if p.score >= 8 else ('stretch' if p.score >= 6 else 'skip') }}">{{ p.score }}/10 · {{ p.verdict }}</span></div>
+        <h3>Strengths</h3><ul class="small">{% for x in p.strengths %}<li>{{ x }}</li>{% endfor %}</ul>
+        <h3>Concerns</h3><ul class="small">{% for x in p.concerns %}<li>{{ x }}</li>{% endfor %}</ul></div>
+      {% endfor %}
+    </div>
+    <h3>Projects that prove the key requirements</h3>
+    <div class="tbl"><table>{% for x in panel.supporting_projects %}<tr class="small"><td><b>{{ x.requirement }}</b></td><td>{{ x.proof }}<br><span class="muted">{{ x.evidence }}</span></td><td>{{ x.talking_point }}</td></tr>{% endfor %}</table></div>
+    <h3>Fixes applied</h3><ul class="small">{% for f in panel.top_fixes %}<li><span class="pill">{{ f.target }}</span> {{ f.fix }}</li>{% endfor %}</ul>
+  {% else %}<p class="muted">{{ 'Runs automatically for strong matches (expert mode is on).' if cfg.expert_mode else 'Expert mode is off. Switch it on in Settings to run this automatically for strong matches, or run it here.' }}</p>{% endif %}
+</section>
+
+<section class="card stack" id="prep" style="margin-top:16px">
+  <div class="row" style="justify-content:space-between">
+    <h2>Interview prep</h2>
+    <form method="post" action="/jobs/{{ j.id }}/prep" data-slow="Preparing your interview pack (1-2 min)…"><button class="ghost">{{ 'Rebuild' if prep else 'Prepare' }} pack · ~$0.25</button></form>
+  </div>
+  {% if prep %}
+    <div class="grid">
+      <div><h3>Company brief</h3><ul class="small">{% for x in prep.company_brief %}<li>{{ x }}</li>{% endfor %}</ul>
+        <h3>Verify before the interview</h3><ul class="small">{% for x in prep.verify_before %}<li>{{ x }}</li>{% endfor %}</ul></div>
+      <div><h3>Knowledge base: what to study</h3>{% for k in prep.knowledge %}<details class="small"><summary>{{ k.topic }}</summary><p>{{ k.why }}</p><p>{{ k.study_notes }}</p><p class="muted">Your experience: {{ k.your_experience }}</p></details>{% endfor %}</div>
+    </div>
+    <h3>Your talking points</h3>{% for tp in prep.talking_points %}<details class="small"><summary><b>{{ tp.requirement }}</b> · {{ tp.proof }}</summary><p>{{ tp.star }}</p></details>{% endfor %}
+    {% if prep.mini_projects %}<h3>Close a gap before the interview</h3><ul class="small">{% for m in prep.mini_projects %}<li><b>{{ m.gap }}:</b> {{ m.project }} <span class="muted">· shows {{ m.shows }}</span></li>{% endfor %}</ul>{% endif %}
+    <h3>Likely questions</h3>
+    {% for who in ['recruiter', 'hiring_manager', 'business_owner'] %}
+      <p class="small"><b>{{ labels[who] }}</b></p>
+      {% for q in prep.questions if q.interviewer == who %}<details class="small"><summary>{{ q.question }}</summary><p class="muted">They're checking: {{ q.why }}</p><p>{{ q.answer_outline }}</p><p class="muted">Draws on: {{ q.evidence }}</p></details>{% endfor %}
+    {% endfor %}
+    <h3>Questions to ask them</h3><ul class="small">{% for a in prep.ask_them %}<li><span class="pill">{{ labels.get(a.interviewer, a.interviewer) }}</span> {{ a.question }}</li>{% endfor %}</ul>
+    {% for f in prep.red_flags %}<p class="warnbox small">Probe: {{ f }}</p>{% endfor %}
+  {% else %}<p class="muted">{{ 'Prepared automatically when you mark this job "interview" (expert mode is on).' if cfg.expert_mode else 'Mark the job "interview" and run this, or switch on expert mode to have it done automatically.' }}</p>{% endif %}
+</section>
+
 <div class="grid" style="margin-top:16px">
   <section class="card"><h2>History</h2>
     <ul class="clean small">{% for e in events %}<li><span class="muted">{{ e.at[:16].replace('T', ' ') }}</span> · {{ e.kind }} {% if e.detail %}<span class="muted">· {{ e.detail }}</span>{% endif %}</li>{% endfor %}</ul>

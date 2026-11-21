@@ -11,6 +11,15 @@ jobs status 1 applied                                       # follow-up reminder
 jobs due                                                    # what needs chasing today
 ```
 
+## Expert layer: ATS, four-perspective panel, interview prep
+
+The full algorithm is in **[PLAYBOOK.md](PLAYBOOK.md)**; the prompts are in versioned files under [`src/job_copilot/instructions/`](src/job_copilot/instructions/).
+
+- **ATS check (free, every resume):** keyword coverage in the post's own wording, plus parse and format checks. Missing keywords are split into **add** (in your evidence, so the resume writer uses them word for word) and **gap** (not in your evidence, so never stuffed in). The "honest ceiling" shows the best score your evidence allows.
+- **Panel review:** one review from four perspectives (recruiter, hiring manager, business owner, applicant), with a requirement → project proof map, red flags and up to 6 evidence-only fixes, which are applied and fact-checked. ATS before and after is recorded.
+- **Interview pack** when a job reaches *interview*: company brief, knowledge base, STAR talking points, weekend mini projects for gaps, likely questions by interviewer with answer outlines, and questions to ask.
+- **Expert mode** (Settings) runs the panel and prep automatically. Off by default; both can always be run from a job page. Results are stored on the job's own row.
+
 ## Daily agent (runs by itself)
 
 Every morning at 06:00 SAST (Vercel Cron), with no clicks needed:

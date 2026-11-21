@@ -81,14 +81,15 @@ class DocResult:
 
 
 def _draft_and_check(llm: LLM, model: str, *, system: str, schema, render: Callable, ctx: str, evidence: str,
-                     job: str, doc_name: str, issues_hint: str, max_revisions: int) -> DocResult:
+                     job: str, doc_name: str, issues_hint: str, max_revisions: int,
+                     feedback: list[str] | None = None) -> DocResult:
     check_system = CHECK_SYSTEM.format(doc=doc_name, issues_hint=issues_hint)
-    feedback: list[str] = []
+    feedback = list(feedback or [])
     cost, steps = 0.0, []
     for attempt in range(max_revisions + 1):
         user = ctx
         if feedback:
-            user += "\n\nA fact-checker rejected your previous draft. Write a new one that fixes:\n" + "\n".join(f"- {f}" for f in feedback)
+            user += "\n\nRevise the document to address this feedback (never by adding unsupported claims):\n" + "\n".join(f"- {f}" for f in feedback)
         d = llm.structured(model=model, system=system, user=user, schema=schema, effort="medium")
         text = render(d.parsed)
         c = llm.structured(model=model, system=check_system, schema=LetterCheck, effort="medium",
@@ -101,17 +102,18 @@ def _draft_and_check(llm: LLM, model: str, *, system: str, schema, render: Calla
     return DocResult(doc=d.parsed, text=text, check=c.parsed, revisions=attempt, cost_usd=cost, steps=steps)
 
 
-def write_letter(llm: LLM, model: str, evidence: str, job: str, fit: FitAssessment, max_revisions: int = 2) -> DocResult:
+def write_letter(llm: LLM, model: str, evidence: str, job: str, fit: FitAssessment, max_revisions: int = 2,
+                 feedback: list[str] | None = None) -> DocResult:
     ctx = _ctx(evidence, job) + f"\n\n<assessment>\n{fit.model_dump_json(indent=1)}\n</assessment>"
     return _draft_and_check(llm, model, system=LETTER_SYSTEM, schema=CoverLetter, render=lambda l: l.body,
                             ctx=ctx, evidence=evidence, job=job, doc_name="cover_letter",
                             issues_hint="tone, length (target 200-300 words), generic phrasing, weak link to the job",
-                            max_revisions=max_revisions)
+                            max_revisions=max_revisions, feedback=feedback)
 
 
-def render_resume(r: TailoredResume, name: str = "") -> str:
-    out = [f"# {name}".rstrip() if name else "", f"**{r.headline}**", "", r.summary, "", "## Skills", " · ".join(r.skills), "",
-           "## Experience"]
+def render_resume(r: TailoredResume, name: str = "", contact: str = "") -> str:
+    out = [f"# {name}".rstrip() if name else "", contact, f"**{r.headline}**", "", r.summary, "", "## Skills",
+           " · ".join(r.skills), "", "## Experience"]
     for e in r.experience:
         out.append(f"### {e.role}, {e.org} ({e.dates})")
         out += [f"- {b}" for b in e.bullets]
@@ -128,9 +130,15 @@ def render_resume(r: TailoredResume, name: str = "") -> str:
 
 
 def tailor_resume(llm: LLM, model: str, evidence: str, job: str, fit: FitAssessment, name: str = "",
-                  max_revisions: int = 2) -> DocResult:
+                  max_revisions: int = 2, *, contact: str = "", ats_targets: list[str] | None = None,
+                  feedback: list[str] | None = None) -> DocResult:
     ctx = _ctx(evidence, job) + f"\n\n<assessment>\n{fit.model_dump_json(indent=1)}\n</assessment>"
+    if ats_targets:
+        ctx += ("\n\n<ats_targets>\nApplicant tracking systems rank by literal keyword match. Each of these job keywords is "
+                "supported by the evidence: use each one, in this exact wording, where it is truthful (skills, bullets or "
+                "summary). Make the headline mirror the job title if the evidence supports it.\n"
+                + "\n".join(f"- {t}" for t in ats_targets) + "\n</ats_targets>")
     return _draft_and_check(llm, model, system=RESUME_SYSTEM, schema=TailoredResume,
-                            render=lambda r: render_resume(r, name), ctx=ctx, evidence=evidence, job=job,
+                            render=lambda r: render_resume(r, name, contact), ctx=ctx, evidence=evidence, job=job,
                             doc_name="resume", issues_hint="relevance ordering, vague bullets, length (aim for 2 pages max)",
-                            max_revisions=max_revisions)
+                            max_revisions=max_revisions, feedback=feedback)

@@ -23,7 +23,7 @@ from .service import Copilot, NoProfile
 from .suggestions import suggestions
 from .tracker import BudgetExceeded
 
-EST = {"assess": 0.06, "resume": 0.25, "letter": 0.15}  # conservative per-action estimates (USD)
+EST = {"assess": 0.06, "resume": 0.25, "letter": 0.15, "review": 0.5, "prep": 0.25}  # conservative estimates (USD)
 
 
 def config(c: Copilot) -> AutomationConfig:
@@ -52,7 +52,8 @@ def run(c: Copilot, trigger: str = "cron", *, discover_fn: Callable | None = Non
         return {"skipped": "another run started in the last 10 minutes"}
     t0, spent = clock(), 0.0
     report: dict = {"trigger": trigger, "sources": {}, "found": 0, "new_leads": 0, "new_matches": 0,
-                    "assessed": [], "docs": [], "errors": [], "stopped": None, "spent_usd": 0.0}
+                    "assessed": [], "docs": [], "reviews": [], "preps": [], "errors": [], "stopped": None,
+                    "spent_usd": 0.0, "expert_mode": cfg.expert_mode}
 
     def can(action: str) -> bool:
         if clock() - t0 > time_budget_s:
@@ -75,6 +76,18 @@ def run(c: Copilot, trigger: str = "cron", *, discover_fn: Callable | None = Non
                 report["new_leads"] += 1
                 report["new_matches"] += 1 if lead.keep else 0
 
+        # 2a. expert mode: interview prep first -- an interview is the most time-critical thing
+        if cfg.expert_mode:
+            for j in c.t.list("interview"):
+                if c.t.get_json(j.id, "prep") or not can("prep"):
+                    continue
+                try:
+                    p = c.prep(j.id)
+                    spent += p["cost_usd"]
+                    report["preps"].append({"job_id": j.id, "role": f"{j.title} @ {j.company}", "questions": len(p["questions"])})
+                except LLMError as e:
+                    report["errors"].append(f"prep #{j.id}: {e}")
+
         # 2. documents for strong matches you haven't acted on yet
         strong = [j for j in c.t.list("new")
                   if j.recommendation == "apply" and j.score >= cfg.auto_docs_min_score and not (j.has_resume and j.has_letter)]
@@ -91,6 +104,23 @@ def run(c: Copilot, trigger: str = "cron", *, discover_fn: Callable | None = Non
                                            "grounded": res.grounded})
                 except LLMError as e:
                     report["errors"].append(f"{kind} #{j.id}: {e}")
+
+        # 2b. expert mode: four-perspective panel review (+ evidence-only revision) for strong matches with documents
+        if cfg.expert_mode:
+            for j in c.t.list("new"):
+                j = c.t.get(j.id)
+                if not (j.recommendation == "apply" and j.score >= cfg.auto_docs_min_score and j.has_resume and j.has_letter):
+                    continue
+                if c.t.get_json(j.id, "panel") or not can("review"):
+                    continue
+                try:
+                    r = c.review(j.id)
+                    spent += r["cost_usd"]
+                    report["reviews"].append({"job_id": j.id, "role": f"{j.title} @ {j.company}",
+                                              "scores": {p["perspective"]: p["score"] for p in r["perspectives"]},
+                                              "ats": f"{r['ats_before']}→{r['ats_after']}"})
+                except LLMError as e:
+                    report["errors"].append(f"review #{j.id}: {e}")
 
         # 3. score the best queued leads
         for lead in c.t.queued_leads(cfg.assess_per_run):
@@ -131,6 +161,12 @@ def digest(r: dict, monthly_budget: float) -> str:
     if r["docs"]:
         lines.append("Ready to send (resume/letter written and fact-checked):")
         lines += [f"  • {d['kind']}: {d['role']}" + ("" if d["grounded"] else " ⚠️ check flagged claims") for d in r["docs"]]
+    if r.get("reviews"):
+        lines.append("Panel-reviewed and improved (recruiter / hiring manager / business owner / you):")
+        lines += [f"  • {x['role']}: " + " / ".join(str(v) for v in x["scores"].values()) + f", ATS {x['ats']}" for x in r["reviews"]]
+    if r.get("preps"):
+        lines.append("Interview prep ready:")
+        lines += [f"  • {x['role']} ({x['questions']} likely questions)" for x in r["preps"]]
     if r.get("todo"):
         lines.append("Your to-do:")
         lines += [f"  • {t}" for t in r["todo"]]

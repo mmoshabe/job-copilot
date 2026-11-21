@@ -49,6 +49,9 @@ class AutomationConfig:
     run_budget_usd: float = 0.35
     auto_docs_min_score: int = 75
     min_prefilter_score: float = 3.0
+    # Expert mode (off until you switch it on): panel review for strong matches, interview prep at interview stage.
+    # Needs a bigger per-run budget (~$0.75) -- a review with revisions costs ~$0.50, a prep pack ~$0.25.
+    expert_mode: bool = False
 
     @classmethod
     def from_dict(cls, d: dict | None) -> "AutomationConfig":

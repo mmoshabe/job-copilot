@@ -92,6 +92,7 @@ class Tracker:
             self.db = sqlite3.connect(path, check_same_thread=False)
         for t in _tables(self._pg):
             self._x(t)
+        self._migrate()
 
     # -- low level -------------------------------------------------------------
 
@@ -298,3 +299,26 @@ class Tracker:
 
     def spend_since(self, iso: str) -> float:
         return float(self._x("SELECT COALESCE(SUM(cost_usd), 0) FROM llm_usage WHERE at >= ?", (iso,)).fetchone()[0])
+
+    # -- expert results, stored on the job's own row ---------------------------------------
+
+    JSON_COLS = ("ats", "panel", "prep")
+
+    def _migrate(self) -> None:
+        """Add the expert-result columns to an existing jobs table (idempotent)."""
+        for col in self.JSON_COLS:
+            if self._pg:
+                self._x(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {col} TEXT")
+            elif col not in {r[1] for r in self._x("PRAGMA table_info(jobs)").fetchall()}:
+                self._x(f"ALTER TABLE jobs ADD COLUMN {col} TEXT")
+
+    def save_json(self, job_id: int, col: str, data: dict) -> None:
+        if col not in self.JSON_COLS:
+            raise ValueError(col)
+        self._x(f"UPDATE jobs SET {col} = ? WHERE id = ?", (json.dumps(data), job_id))
+
+    def get_json(self, job_id: int, col: str) -> dict | None:
+        if col not in self.JSON_COLS:
+            raise ValueError(col)
+        r = self._x(f"SELECT {col} FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        return json.loads(r[0]) if r and r[0] else None

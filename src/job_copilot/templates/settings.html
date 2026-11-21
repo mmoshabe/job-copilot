@@ -16,6 +16,9 @@
       <label class="small"><b>Himalayas searches</b><textarea name="himalayas_queries" style="min-height:70px">{{ cfg.himalayas_queries|join('\n') }}</textarea></label>
       <label class="small"><b>Remotive categories</b><textarea name="remotive_categories" style="min-height:50px">{{ cfg.remotive_categories|join('\n') }}</textarea></label>
       <label class="small"><b>Skills that raise the match</b><textarea name="skills">{{ cfg.skills|join('\n') }}</textarea></label>
+      <h2>Expert mode</h2>
+      <label class="row small"><input type="checkbox" name="expert_mode" style="width:auto" {{ 'checked' if cfg.expert_mode }}>
+        <span><b>Panel review + interview prep, automatically.</b> Strong matches get a recruiter / hiring manager / business owner / applicant review and an improved resume (~$0.50 each). Jobs you mark <i>interview</i> get a prep pack (~$0.25). Off = you can still run both from a job page.</span></label>
       <h2>Budget</h2>
       <label class="small"><b>Max AI spend per daily run (USD)</b><input name="run_budget_usd" value="{{ cfg.run_budget_usd }}"></label>
       <label class="small"><b>Jobs scored per run</b><input name="assess_per_run" value="{{ cfg.assess_per_run }}"></label>

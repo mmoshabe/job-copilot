@@ -112,3 +112,27 @@ def test_settings_save_and_validate(client):
     assert cfg.titles == ["support engineer", "ai engineer"] and cfg.assess_per_run == 3
     bad = client.post("/settings", data=form | {"run_budget_usd": "99"}, follow_redirects=False)
     assert "err=" in bad.headers["location"]
+
+
+def test_expert_sections_and_buttons(client, monkeypatch):
+    from test_expert import ExpertLLM
+    login(client)
+    web.copilot()._llm = ExpertLLM()
+    client.post("/jobs", data={"text": "Support Engineer. Python, SQL, REST API, Docker.", "url": ""})
+    for kind in ("review", "prep"):
+        r = client.post(f"/jobs/1/{kind}", follow_redirects=False)
+        assert r.status_code == 303 and "err=" not in r.headers["location"], kind
+    page = client.get("/jobs/1").text
+    for text in ("ATS check", "Panel review", "Hiring manager", "Business owner", "Interview prep",
+                 "Containerise a FastAPI app", "What does success look like in 90 days?"):
+        assert text in page, text
+    assert client.post("/jobs/1/bogus").status_code == 404
+
+
+def test_expert_mode_setting(client):
+    login(client)
+    form = {k: "" for k in web._LISTS} | {"assess_per_run": "5", "run_budget_usd": "0.4", "auto_docs_min_score": "75",
+                                         "min_prefilter_score": "3", "expert_mode": "on"}
+    r = client.post("/settings", data=form, follow_redirects=False)
+    assert web.automation.config(web.copilot()).expert_mode is True
+    assert "expert+mode+needs" in r.headers["location"] or "expert%20mode" in r.headers["location"] or "needs+about" in r.headers["location"]
