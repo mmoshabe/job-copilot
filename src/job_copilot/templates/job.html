@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ j.title }} @ {{ j.company }}{% endblock %}
+{% block body %}
+<section class="card stack">
+  <div class="row" style="justify-content:space-between">
+    <div>
+      <h1>{{ j.title }}</h1>
+      <div class="muted">{{ j.company }}{% if j.location %} · {{ j.location }}{% endif %}{% if j.url %} · <a href="{{ j.url }}" target="_blank" rel="noopener">job post ↗</a>{% endif %}</div>
+    </div>
+    <span class="pill {{ j.recommendation }}" style="font-size:15px;padding:4px 12px">{{ j.score }}/100 · {{ j.recommendation }}</span>
+  </div>
+  <p>{{ fit.summary }}</p>
+  <div class="row">
+    <form method="post" action="/jobs/{{ j.id }}/status" class="row">
+      <select name="status" style="width:auto">{% for s in statuses %}<option {{ 'selected' if s == j.status }}>{{ s }}</option>{% endfor %}</select>
+      <button class="ghost">Update status</button>
+    </form>
+    {% if j.follow_up_on %}<span class="muted small">Follow up on {{ j.follow_up_on }}</span>
+    <form method="post" action="/jobs/{{ j.id }}/snooze"><input type="hidden" name="days" value="7"><button class="ghost">Snooze 7 days</button></form>{% endif %}
+  </div>
+</section>
+
+<div class="grid" style="margin-top:16px">
+  <section class="card">
+    <h2>Requirement by requirement</h2>
+    <div class="tbl"><table>
+      {% for r in fit.requirements %}
+      <tr><td>{% if r.met.value == 'yes' %}✅{% elif r.met.value == 'partial' %}🟡{% else %}❌{% endif %}</td>
+          <td><b>{{ r.text }}</b> <span class="muted small">{{ r.kind.value }}</span>{% if r.evidence %}<br><span class="muted small">← {{ r.evidence }}</span>{% endif %}</td></tr>
+      {% endfor %}
+    </table></div>
+    {% for d in fit.dealbreakers %}<p class="warnbox">⛔ Dealbreaker: {{ d }}</p>{% endfor %}
+  </section>
+
+  <section class="card stack">
+    <h2>Documents</h2>
+    <p class="muted small">Drafted from your CV + portfolio, then a second AI pass fact-checks every claim. ≈ $0.15–0.40 each.</p>
+    <div class="row">
+      <form method="post" action="/jobs/{{ j.id }}/resume" data-slow="Tailoring resume (up to a minute)…"><button>{{ 'Redo' if resume else 'Tailor my resume' }}</button></form>
+      <form method="post" action="/jobs/{{ j.id }}/letter" data-slow="Writing letter (up to a minute)…"><button {{ 'class=ghost' if not resume }}>{{ 'Redo letter' if letter else 'Write cover letter' }}</button></form>
+    </div>
+    <h3>Notes</h3>
+    {% if j.notes %}<pre>{{ j.notes }}</pre>{% endif %}
+    <form method="post" action="/jobs/{{ j.id }}/note" class="row"><input name="text" placeholder="e.g. Spoke to recruiter, interview Tue" required style="flex:1"><button class="ghost">Add</button></form>
+  </section>
+</div>
+
+{% macro checkbox(check) %}
+  {% if check.unsupported_claims %}
+    <div class="warnbox"><b>⚠️ Fix before sending: not backed by your CV/portfolio</b>
+    <ul>{% for u in check.unsupported_claims %}<li>{{ u }}</li>{% endfor %}</ul></div>
+  {% else %}<div class="okbox">✅ Fact-check passed: every claim is backed by your CV or portfolio.</div>{% endif %}
+{% endmacro %}
+
+{% if resume %}
+<section class="card stack" id="resume" style="margin-top:16px">
+  <div class="row" style="justify-content:space-between"><h2>Tailored resume</h2>
+    <div class="row"><a class="btn ghost" href="/jobs/{{ j.id }}/resume/print" target="_blank">Print / save PDF</a><a class="btn ghost" href="/jobs/{{ j.id }}/resume.md">Download .md</a></div></div>
+  {{ checkbox(resume_check) }}
+  <div class="grid">
+    {% if resume_check.changes %}<div><h3>What changed for this job</h3><ul>{% for c in resume_check.changes %}<li>{{ c }}</li>{% endfor %}</ul></div>{% endif %}
+    {% if resume_check.gaps %}<div><h3>Gaps, and how to address them honestly</h3><ul>{% for g in resume_check.gaps %}<li>{{ g }}</li>{% endfor %}</ul></div>{% endif %}
+  </div>
+  <details><summary>Show resume</summary><div class="doc">{{ resume | md | safe }}</div></details>
+</section>
+{% endif %}
+
+{% if letter %}
+<section class="card stack" id="letter" style="margin-top:16px">
+  <div class="row" style="justify-content:space-between"><h2>Cover letter</h2>
+    <div class="row"><button class="ghost" onclick="navigator.clipboard.writeText(document.getElementById('lt').innerText);this.textContent='Copied'">Copy</button><a class="btn ghost" href="/jobs/{{ j.id }}/letter.md">Download .md</a></div></div>
+  {{ checkbox(letter_check) }}
+  <div class="doc" id="lt" style="white-space:pre-wrap">{{ letter }}</div>
+</section>
+{% endif %}
+
+<div class="grid" style="margin-top:16px">
+  <section class="card"><h2>History</h2>
+    <ul class="clean small">{% for e in events %}<li><span class="muted">{{ e.at[:16].replace('T', ' ') }}</span> · {{ e.kind }} {% if e.detail %}<span class="muted">· {{ e.detail }}</span>{% endif %}</li>{% endfor %}</ul>
+  </section>
+  <section class="card"><details><summary>Original job post</summary><pre>{{ job_text }}</pre></details></section>
+</div>
+{% endblock %}

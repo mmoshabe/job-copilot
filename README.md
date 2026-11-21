@@ -11,6 +11,21 @@ jobs status 1 applied                                       # follow-up reminder
 jobs due                                                    # what needs chasing today
 ```
 
+## Web dashboard
+
+A private dashboard (password login) runs on Vercel with Neon Postgres, on free tiers:
+
+- **Dashboard:** add a job by link or pasted text; pipeline counts; follow-ups due; **suggestions** (what to apply to, chase or drop, computed in code at no cost); **skill gaps** across the jobs you're targeting; recent activity.
+- **Job page:** requirement-by-requirement fit, status, notes, history; **tailored resume** (what changed and why, gaps with honest suggestions, print to PDF) and **cover letter**, both fact-checked against your evidence.
+- **Evidence:** your CV, project notes, and your portfolio site's `lib/data.ts` (synced with `jobs profile push`). Resumes and letters can only use what's here.
+- **Cost control:** AI runs only when you click; spend is shown in the header; a monthly cap (`JOBS_MONTHLY_BUDGET_USD`, default $5) blocks paid actions once it's reached.
+- **Security:** HMAC-signed session cookie, constant-time password check, `noindex` and `no-store` headers. CV and applications live only in the database and the gitignored `data/` folder.
+
+```bash
+uv run jobs web          # local dashboard on http://localhost:8001
+vercel deploy --prod     # deployed dashboard (needs ANTHROPIC_API_KEY, JOBS_DASHBOARD_PASSWORD, JOBS_SESSION_SECRET, DATABASE_URL)
+```
+
 ## How it works
 
 ```mermaid
@@ -44,7 +59,9 @@ uv run jobs add <url | file>
 | `jobs add <url\|file\|->  [--url LINK]` | Fetch, assess and track a job (paste via `-`) |
 | `jobs list [--status applied]` | All tracked jobs, best fit first |
 | `jobs show <id>` | Requirement-by-requirement breakdown |
-| `jobs letter <id>` | Fact-checked cover letter → `data/letters/` |
+| `jobs letter <id>` / `jobs resume <id>` | Fact-checked cover letter / resume tailored to the job |
+| `jobs suggest` | What to do next (no cost) |
+| `jobs profile push` | Upload CV, project notes and portfolio evidence |
 | `jobs status <id> applied\|interview\|offer\|rejected\|…` | Update; `applied` sets a follow-up reminder |
 | `jobs due` / `jobs snooze <id> 7` / `jobs note <id> "…"` | Follow-ups and notes |
 

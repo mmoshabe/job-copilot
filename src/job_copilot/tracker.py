@@ -1,21 +1,40 @@
-"""Application tracker: a local SQLite file in data/ (private, gitignored)."""
+"""Storage: jobs, history events, profile (CV + portfolio evidence) and LLM spend.
+
+Postgres when DATABASE_URL is set (deployed, Neon); otherwise a local SQLite file in
+data/ (private, gitignored). Same SQL for both, with `?` placeholders translated."""
 
 from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 STATUSES = ("new", "applied", "interview", "offer", "rejected", "withdrawn", "skipped")
+CLOSED = ("rejected", "withdrawn", "skipped", "offer")
 
-_SCHEMA = """CREATE TABLE IF NOT EXISTS jobs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company TEXT, title TEXT, location TEXT, url TEXT,
-    score INTEGER, recommendation TEXT, assessment TEXT, job_text TEXT,
-    status TEXT DEFAULT 'new', applied_on TEXT, follow_up_on TEXT,
-    letter_path TEXT, notes TEXT DEFAULT '', added_on TEXT)"""
+
+class BudgetExceeded(Exception):
+    pass
+
+
+def _tables(pg: bool) -> list[str]:
+    pk = "SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    return [
+        f"""CREATE TABLE IF NOT EXISTS jobs (
+            id {pk}, company TEXT, title TEXT, location TEXT, url TEXT,
+            score INTEGER, recommendation TEXT, assessment TEXT, job_text TEXT,
+            status TEXT DEFAULT 'new', applied_on TEXT, follow_up_on TEXT,
+            letter TEXT, letter_check TEXT, resume TEXT, resume_check TEXT,
+            notes TEXT DEFAULT '', added_on TEXT)""",
+        f"""CREATE TABLE IF NOT EXISTS events (
+            id {pk}, job_id INTEGER, kind TEXT, detail TEXT, at TEXT)""",
+        """CREATE TABLE IF NOT EXISTS profile (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)""",
+        f"""CREATE TABLE IF NOT EXISTS llm_usage (
+            id {pk}, action TEXT, model TEXT, job_id INTEGER, cost_usd REAL, at TEXT)""",
+    ]
 
 
 @dataclass
@@ -30,78 +49,194 @@ class Job:
     status: str
     applied_on: str | None
     follow_up_on: str | None
-    letter_path: str | None
     notes: str
     added_on: str
+    has_letter: bool
+    has_resume: bool
+
+
+class _Rows:
+    def __init__(self, rows: list) -> None:
+        self._rows = rows
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self) -> list:
+        return self._rows
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 class Tracker:
-    def __init__(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(path)
-        self.db.execute(_SCHEMA)
-        self.db.commit()
+    _COLS = ("id, company, title, location, url, score, recommendation, status, applied_on, follow_up_on, "
+             "notes, added_on, letter IS NOT NULL, resume IS NOT NULL")
 
-    def add(self, *, company, title, location, url, score, recommendation, assessment: dict, job_text, today: date | None = None) -> int:
+    def __init__(self, path: Path | None = None, database_url: str | None = None) -> None:
+        self._lock = threading.Lock()
+        self._pg = bool(database_url)
+        self._url = database_url
+        if self._pg:
+            self.db = self._connect_pg()
+        else:
+            path = path or Path(":memory:")
+            if str(path) != ":memory:":
+                path.parent.mkdir(parents=True, exist_ok=True)
+            self.db = sqlite3.connect(path, check_same_thread=False)
+        for t in _tables(self._pg):
+            self._x(t)
+
+    # -- low level -------------------------------------------------------------
+
+    def _connect_pg(self):
+        import psycopg
+
+        return psycopg.connect(self._url, autocommit=True)
+
+    def _x(self, sql: str, params: tuple = ()):
+        if not self._pg:
+            with self._lock:
+                cur = self.db.execute(sql, params)
+                rows = cur.fetchall() if cur.description else []  # read before commit (RETURNING)
+                self.db.commit()
+                return _Rows(rows)
+        import psycopg
+
+        sql = sql.replace("?", "%s")
+        with self._lock:
+            try:
+                return self.db.execute(sql, params)
+            except psycopg.OperationalError:  # Neon drops idle connections
+                self.db = self._connect_pg()
+                return self.db.execute(sql, params)
+
+    def _job(self, r) -> Job:
+        return Job(*r[:12], bool(r[12]), bool(r[13]))
+
+    # -- events ------------------------------------------------------------------
+
+    def log(self, kind: str, detail: str = "", job_id: int | None = None) -> None:
+        self._x("INSERT INTO events (job_id, kind, detail, at) VALUES (?, ?, ?, ?)", (job_id, kind, detail, _now()))
+
+    def events(self, job_id: int | None = None, limit: int = 200) -> list[dict]:
+        q = "SELECT e.at, e.kind, e.detail, e.job_id, j.company, j.title FROM events e LEFT JOIN jobs j ON j.id = e.job_id"
+        p: tuple = ()
+        if job_id is not None:
+            q, p = q + " WHERE e.job_id = ?", (job_id,)
+        rows = self._x(q + f" ORDER BY e.id DESC LIMIT {int(limit)}", p).fetchall()
+        return [dict(zip(("at", "kind", "detail", "job_id", "company", "title"), r)) for r in rows]
+
+    # -- jobs ----------------------------------------------------------------------
+
+    def add(self, *, company, title, location, url, score, recommendation, assessment: dict, job_text,
+            today: date | None = None) -> int:
         if url:
-            row = self.db.execute("SELECT id FROM jobs WHERE url = ?", (url,)).fetchone()
+            row = self._x("SELECT id FROM jobs WHERE url = ?", (url,)).fetchone()
             if row:
-                return row[0]  # already tracked: don't duplicate
-        cur = self.db.execute(
+                return row[0]
+        row = self._x(
             "INSERT INTO jobs (company, title, location, url, score, recommendation, assessment, job_text, added_on)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
             (company, title, location, url, score, recommendation, json.dumps(assessment), job_text,
              (today or date.today()).isoformat()),
-        )
-        self.db.commit()
-        return cur.lastrowid
-
-    def _row(self, r) -> Job:
-        return Job(*r)
-
-    _COLS = "id, company, title, location, url, score, recommendation, status, applied_on, follow_up_on, letter_path, notes, added_on"
+        ).fetchone()
+        self.log("added", f"fit {score}/100 → {recommendation}", row[0])
+        return row[0]
 
     def get(self, job_id: int) -> Job | None:
-        r = self.db.execute(f"SELECT {self._COLS} FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        return self._row(r) if r else None
+        r = self._x(f"SELECT {self._COLS} FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        return self._job(r) if r else None
 
     def raw(self, job_id: int) -> tuple[dict, str]:
-        a, t = self.db.execute("SELECT assessment, job_text FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        a, t = self._x("SELECT assessment, job_text FROM jobs WHERE id = ?", (job_id,)).fetchone()
         return json.loads(a), t
+
+    def all_assessments(self) -> list[tuple[Job, dict]]:
+        rows = self._x(f"SELECT {self._COLS}, assessment FROM jobs").fetchall()
+        return [(self._job(r[:14]), json.loads(r[14])) for r in rows]
 
     def list(self, status: str | None = None) -> list[Job]:
         q, p = f"SELECT {self._COLS} FROM jobs", ()
         if status:
             q, p = q + " WHERE status = ?", (status,)
-        return [self._row(r) for r in self.db.execute(q + " ORDER BY score DESC, id", p)]
+        return [self._job(r) for r in self._x(q + " ORDER BY score DESC, id", p).fetchall()]
 
     def set_status(self, job_id: int, status: str, follow_up_days: int, today: date | None = None) -> None:
         if status not in STATUSES:
             raise ValueError(f"status must be one of {', '.join(STATUSES)}")
         today = today or date.today()
         if status == "applied":
-            self.db.execute("UPDATE jobs SET status = ?, applied_on = ?, follow_up_on = ? WHERE id = ?",
-                            (status, today.isoformat(), (today + timedelta(days=follow_up_days)).isoformat(), job_id))
-        elif status in ("rejected", "withdrawn", "skipped", "offer"):
-            self.db.execute("UPDATE jobs SET status = ?, follow_up_on = NULL WHERE id = ?", (status, job_id))
+            self._x("UPDATE jobs SET status = ?, applied_on = ?, follow_up_on = ? WHERE id = ?",
+                    (status, today.isoformat(), (today + timedelta(days=follow_up_days)).isoformat(), job_id))
+        elif status in CLOSED:
+            self._x("UPDATE jobs SET status = ?, follow_up_on = NULL WHERE id = ?", (status, job_id))
         else:
-            self.db.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
-        self.db.commit()
+            self._x("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
+        self.log("status", status, job_id)
 
     def snooze(self, job_id: int, days: int, today: date | None = None) -> None:
         d = ((today or date.today()) + timedelta(days=days)).isoformat()
-        self.db.execute("UPDATE jobs SET follow_up_on = ? WHERE id = ?", (d, job_id))
-        self.db.commit()
-
-    def set_letter(self, job_id: int, path: str) -> None:
-        self.db.execute("UPDATE jobs SET letter_path = ? WHERE id = ?", (path, job_id))
-        self.db.commit()
+        self._x("UPDATE jobs SET follow_up_on = ? WHERE id = ?", (d, job_id))
+        self.log("snoozed", f"follow-up moved to {d}", job_id)
 
     def add_note(self, job_id: int, note: str) -> None:
-        self.db.execute("UPDATE jobs SET notes = notes || ? WHERE id = ?", (f"{date.today()}: {note}\n", job_id))
-        self.db.commit()
+        self._x("UPDATE jobs SET notes = notes || ? WHERE id = ?", (f"{date.today()}: {note}\n", job_id))
+        self.log("note", note[:120], job_id)
 
     def due(self, today: date | None = None) -> list[Job]:
         t = (today or date.today()).isoformat()
-        return [self._row(r) for r in self.db.execute(
-            f"SELECT {self._COLS} FROM jobs WHERE follow_up_on IS NOT NULL AND follow_up_on <= ? ORDER BY follow_up_on", (t,))]
+        return [self._job(r) for r in self._x(
+            f"SELECT {self._COLS} FROM jobs WHERE follow_up_on IS NOT NULL AND follow_up_on <= ? ORDER BY follow_up_on",
+            (t,)).fetchall()]
+
+    # -- documents (letter / tailored resume) ----------------------------------------
+
+    def save_doc(self, job_id: int, kind: str, text: str, check: dict) -> None:
+        if kind not in ("letter", "resume"):
+            raise ValueError(kind)
+        self._x(f"UPDATE jobs SET {kind} = ?, {kind}_check = ? WHERE id = ?", (text, json.dumps(check), job_id))
+        flagged = len(check.get("unsupported_claims", []))
+        self.log(kind, "fact-check passed" if not flagged else f"{flagged} unsupported claim(s) flagged", job_id)
+
+    def doc(self, job_id: int, kind: str) -> tuple[str | None, dict]:
+        if kind not in ("letter", "resume"):
+            raise ValueError(kind)
+        text, check = self._x(f"SELECT {kind}, {kind}_check FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        return text, json.loads(check) if check else {}
+
+    # -- profile (CV + portfolio evidence) -------------------------------------------
+
+    def set_profile(self, key: str, value: str) -> None:
+        if self.profile(key) == value:
+            return  # unchanged: don't touch the timestamp or log noise
+        self._x("INSERT INTO profile (key, value, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+                (key, value, _now()))
+        self.log("profile", f"{key} updated")
+
+    def profile(self, key: str) -> str | None:
+        r = self._x("SELECT value FROM profile WHERE key = ?", (key,)).fetchone()
+        return r[0] if r else None
+
+    def profile_updated(self, key: str) -> str | None:
+        r = self._x("SELECT updated_at FROM profile WHERE key = ?", (key,)).fetchone()
+        return r[0] if r else None
+
+    # -- spend -------------------------------------------------------------------------
+
+    def record_usage(self, action: str, model: str, cost_usd: float, job_id: int | None = None) -> None:
+        self._x("INSERT INTO llm_usage (action, model, job_id, cost_usd, at) VALUES (?, ?, ?, ?, ?)",
+                (action, model, job_id, cost_usd, _now()))
+
+    def month_spend(self) -> float:
+        start = date.today().replace(day=1).isoformat()
+        r = self._x("SELECT COALESCE(SUM(cost_usd), 0) FROM llm_usage WHERE at >= ?", (start,)).fetchone()
+        return float(r[0])
+
+    def check_budget(self, monthly_budget_usd: float) -> None:
+        spent = self.month_spend()
+        if spent >= monthly_budget_usd:
+            raise BudgetExceeded(f"Monthly AI budget reached (${spent:.2f} of ${monthly_budget_usd:.2f}). "
+                                 "Raise JOBS_MONTHLY_BUDGET_USD to continue.")

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="card">
+  <div class="row" style="justify-content:space-between">
+    <h1>Jobs</h1>
+    <form method="get" class="row"><select name="status" onchange="this.form.submit()">
+      <option value="">All statuses</option>
+      {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if s == status }}>{{ s }}</option>{% endfor %}
+    </select></form>
+  </div>
+  <div class="tbl"><table>
+    <tr><th>Fit</th><th>Role</th><th>Status</th><th>Docs</th><th>Follow up</th><th>Added</th></tr>
+    {% for j in jobs %}
+    <tr>
+      <td><span class="pill {{ j.recommendation }}">{{ j.score }} · {{ j.recommendation }}</span></td>
+      <td><a href="/jobs/{{ j.id }}">{{ j.title }}</a><br><span class="muted small">{{ j.company }}{% if j.location %} · {{ j.location }}{% endif %}</span></td>
+      <td>{{ j.status }}</td>
+      <td class="small">{{ '📄' if j.has_resume }}{{ '✉️' if j.has_letter }}</td>
+      <td class="small">{{ j.follow_up_on or '' }}</td>
+      <td class="small muted">{{ j.added_on }}</td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="muted">No jobs yet. Add one from the <a href="/">dashboard</a>.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}Job Copilot{% endblock %}</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c1b19;--muted:#6b6862;--line:#e4e1da;--accent:#1f6f5c;--accent-ink:#fff;--warn:#9a5b00;--warn-bg:#fff4e0;--bad:#a12d2d;--bad-bg:#fdecec;--ok:#1f6f5c;--ok-bg:#e5f3ee}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1e1d1b;--ink:#eceae4;--muted:#a19d94;--line:#2f2d2a;--accent:#5ec7a6;--accent-ink:#0d1f1a;--warn:#f0b35b;--warn-bg:#2e2412;--bad:#f08a8a;--bad-bg:#2f1818;--ok:#5ec7a6;--ok-bg:#132a23}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
+a{color:var(--accent)}header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+header .brand{font-weight:700;margin-right:auto}header nav a{color:var(--ink);text-decoration:none;padding:4px 8px;border-radius:6px}header nav a.on{background:var(--bg);font-weight:600}
+.spend{font-size:13px;color:var(--muted)}main{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:0 0 10px}h3{font-size:14px;margin:14px 0 6px}.muted{color:var(--muted)}.small{font-size:13px}
+.stats{display:flex;flex-wrap:wrap;gap:8px}.stat{flex:1 1 90px;background:var(--bg);border-radius:10px;padding:10px 12px}.stat b{display:block;font-size:22px}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.tbl{overflow-x:auto}.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--bg)}
+.apply{background:var(--ok-bg);color:var(--ok)}.stretch{background:var(--warn-bg);color:var(--warn)}.skip{background:var(--bad-bg);color:var(--bad)}
+.flash{padding:10px 14px;border-radius:10px;margin-bottom:14px;background:var(--ok-bg);color:var(--ok)}.flash.err{background:var(--bad-bg);color:var(--bad)}
+input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}textarea{min-height:120px}
+button,.btn{display:inline-block;font:inherit;font-weight:600;border:0;border-radius:8px;padding:8px 14px;background:var(--accent);color:var(--accent-ink);cursor:pointer;text-decoration:none}
+button.ghost,.btn.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}button[disabled]{opacity:.6;cursor:wait}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.row>*{flex:0 0 auto}.stack>*+*{margin-top:10px}
+ul.clean{list-style:none;padding:0;margin:0}ul.clean li{padding:8px 0;border-bottom:1px solid var(--line)}ul.clean li:last-child{border:0}
+.doc{background:var(--bg);border-radius:10px;padding:14px 18px;overflow-wrap:anywhere}.doc h1{font-size:20px}.doc h2{font-size:15px;margin-top:16px}
+.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 14px}.okbox{background:var(--ok-bg);color:var(--ok);border-radius:10px;padding:10px 14px}
+details summary{cursor:pointer;font-weight:600}pre{white-space:pre-wrap;font:13px/1.5 ui-monospace,monospace}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">🧭 Job Copilot</span>
+  <nav>
+    <a href="/" class="{{ 'on' if path == '/' }}">Dashboard</a>
+    <a href="/jobs" class="{{ 'on' if path.startswith('/jobs') }}">Jobs</a>
+    <a href="/history" class="{{ 'on' if path == '/history' }}">History</a>
+    <a href="/profile" class="{{ 'on' if path == '/profile' }}">Profile</a>
+  </nav>
+  <span class="spend" title="AI spend this month">AI spend: ${{ '%.2f'|format(spent) }} / ${{ '%.0f'|format(budget) }}</span>
+  <form method="post" action="/logout"><button class="ghost">Log out</button></form>
+</header>
+<main>
+  {% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+  {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+  {% block body %}{% endblock %}
+</main>
+<script>
+// Paid actions take up to a minute: show it, and prevent double clicks (double spend).
+document.querySelectorAll('form[data-slow]').forEach(f => f.addEventListener('submit', () => {
+  const b = f.querySelector('button'); b.disabled = true; b.textContent = f.dataset.slow;
+}));
+</script>
+</body>
+</html>

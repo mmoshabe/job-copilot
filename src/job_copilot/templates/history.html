@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="card">
+  <h1>History</h1>
+  <p class="muted small">Every job added, status change, document generated, note and profile update.</p>
+  <div class="tbl"><table>
+    <tr><th>When (UTC)</th><th>What</th><th>Job</th><th>Detail</th></tr>
+    {% for e in events %}
+    <tr><td class="small muted">{{ e.at[:16].replace('T', ' ') }}</td><td>{{ e.kind }}</td>
+        <td>{% if e.job_id %}<a href="/jobs/{{ e.job_id }}">{{ e.title }} @ {{ e.company }}</a>{% endif %}</td>
+        <td class="small">{{ e.detail }}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">Nothing yet.</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endblock %}

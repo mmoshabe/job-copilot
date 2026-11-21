@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>Job Copilot · Log in</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c1b19;--line:#e4e1da;--accent:#1f6f5c;--bad:#a12d2d}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1e1d1b;--ink:#eceae4;--line:#2f2d2a;--accent:#5ec7a6;--bad:#f08a8a}}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:16px}
+form{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;width:100%;max-width:340px}
+input{width:100%;box-sizing:border-box;font:inherit;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);margin:10px 0}
+button{width:100%;font:inherit;font-weight:600;border:0;border-radius:8px;padding:9px;background:var(--accent);color:#fff;cursor:pointer}.err{color:var(--bad)}
+</style></head>
+<body>
+<form method="post" action="/login">
+  <h1 style="font-size:20px;margin:0">🧭 Job Copilot</h1>
+  {% if error %}<p class="err">Wrong password.</p>{% endif %}
+  <input type="password" name="password" placeholder="Password" autofocus required autocomplete="current-password">
+  <button>Log in</button>
+</form>
+</body></html>

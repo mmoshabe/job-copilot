@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="grid">
+  <section class="card stack">
+    <h2>Add a job</h2>
+    <form method="post" action="/jobs" class="stack" data-slow="Scoring against your CV…">
+      <input name="url" placeholder="Job link (Greenhouse / Lever / company careers page)">
+      <textarea name="text" placeholder="…or paste the job text (needed for LinkedIn / Indeed). Add the link above too, to keep it."></textarea>
+      <div class="row"><button>Score this job</button><span class="muted small">≈ $0.05 · uses your CV + portfolio</span></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Pipeline</h2>
+    <div class="stats">
+      <div class="stat"><b>{{ total }}</b><span class="muted small">tracked</span></div>
+      <div class="stat"><b>{{ counts['new'] }}</b><span class="muted small">to decide</span></div>
+      <div class="stat"><b>{{ counts['applied'] }}</b><span class="muted small">applied</span></div>
+      <div class="stat"><b>{{ counts['interview'] }}</b><span class="muted small">interviews</span></div>
+      <div class="stat"><b>{{ counts['offer'] }}</b><span class="muted small">offers</span></div>
+    </div>
+    {% if due %}<h3>Follow-ups due</h3>
+    <ul class="clean">{% for j in due %}<li><a href="/jobs/{{ j.id }}">{{ j.title }} @ {{ j.company }}</a> <span class="muted small">applied {{ j.applied_on }}</span></li>{% endfor %}</ul>{% endif %}
+  </section>
+</div>
+
+<div class="grid" style="margin-top:16px">
+  <section class="card">
+    <h2>Suggestions for you</h2>
+    <ul class="clean">
+    {% for s in suggestions %}
+      <li>{% if s.priority == 1 %}🔴{% elif s.priority == 2 %}🟠{% else %}⚪{% endif %}
+        {% if s.job_id %}<a href="/jobs/{{ s.job_id }}">{{ s.text }}</a>{% else %}{{ s.text }}{% endif %}</li>
+    {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Skill gaps across your target jobs</h2>
+    {% if gaps %}
+      <ul class="clean">{% for g, n in gaps %}<li>{{ g }} <span class="muted small">· weight {{ n }}</span></li>{% endfor %}</ul>
+      <p class="muted small">Missing must-haves count double. Closing the top one with a small project lifts several scores at once.</p>
+    {% else %}<p class="muted">Appears once you've scored a few jobs.</p>{% endif %}
+  </section>
+</div>
+
+<div class="grid" style="margin-top:16px">
+  <section class="card">
+    <h2>Best open matches</h2>
+    {% if top %}<ul class="clean">{% for j in top %}<li><span class="pill {{ j.recommendation }}">{{ j.score }}</span> <a href="/jobs/{{ j.id }}">{{ j.title }} @ {{ j.company }}</a></li>{% endfor %}</ul>
+    {% else %}<p class="muted">No open jobs yet.</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Recent activity</h2>
+    <ul class="clean small">{% for e in events %}<li><span class="muted">{{ e.at[:16].replace('T', ' ') }}</span> · {{ e.kind }}{% if e.company %} · <a href="/jobs/{{ e.job_id }}">{{ e.company }}</a>{% endif %} {% if e.detail %}<span class="muted">· {{ e.detail }}</span>{% endif %}</li>{% else %}<li class="muted">Nothing yet.</li>{% endfor %}</ul>
+    <p><a href="/history">Full history →</a></p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>Resume</title>
+<style>
+body{max-width:780px;margin:32px auto;padding:0 24px;font:11pt/1.45 Georgia,"Times New Roman",serif;color:#111;background:#fff}
+h1{font-size:22pt;margin:0 0 2px}h2{font-size:12pt;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #999;padding-bottom:2px;margin:18px 0 8px}
+h3{font-size:11pt;margin:10px 0 2px}ul{margin:4px 0 8px;padding-left:18px}li{margin:2px 0}p{margin:4px 0}
+.bar{font:13px -apple-system,sans-serif;background:#f3f3f3;padding:8px 12px;border-radius:8px;margin-bottom:20px}
+@media print{.bar{display:none}body{margin:0}@page{margin:16mm}}
+</style></head>
+<body>
+<div class="bar">Use your browser's <b>Print → Save as PDF</b>. Check every line before sending; you're responsible for what it says.</div>
+{{ body | md | safe }}
+</body></html>

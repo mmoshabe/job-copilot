@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block body %}
+<p class="muted">Everything here is the <b>evidence</b> the copilot may use. Resumes and letters can only say what's in it, and the fact-checker enforces that. Keep it accurate.</p>
+<div class="grid">
+  <section class="card stack">
+    <h2>CV</h2><span class="muted small">Updated {{ cv_at or 'never' }}</span>
+    <form method="post" action="/profile" class="stack"><input type="hidden" name="key" value="cv">
+      <textarea name="value" style="min-height:420px">{{ cv }}</textarea><button>Save CV</button></form>
+  </section>
+  <section class="card stack">
+    <h2>Project notes</h2><span class="muted small">Updated {{ projects_at or 'never' }}</span>
+    <form method="post" action="/profile" class="stack"><input type="hidden" name="key" value="projects">
+      <textarea name="value" style="min-height:200px">{{ projects }}</textarea><button>Save project notes</button></form>
+    <h2>Portfolio</h2>
+    <span class="muted small">Synced {{ portfolio_at or 'never' }} from your portfolio site's <code>lib/data.ts</code>. Update it by running <code>uv run jobs profile push</code> on your Mac after changing the portfolio.</span>
+    <details><summary>Show synced portfolio evidence</summary><div class="doc">{{ portfolio | md | safe }}</div></details>
+  </section>
+</div>
+{% endblock %}
