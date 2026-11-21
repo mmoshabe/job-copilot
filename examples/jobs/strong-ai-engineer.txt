@@ -1,0 +1,19 @@
+Junior AI Engineer: Mzansi Lending (fictional)
+Location: Johannesburg (hybrid, 3 days in office)
+
+Mzansi Lending gives small businesses fast access to credit. We're adding AI to our customer operations and need an engineer to help build it.
+
+You have:
+- 1–3 years of professional Python experience
+- Experience building REST APIs (FastAPI or Flask)
+- Hands-on experience with LLM APIs (OpenAI, Anthropic or similar)
+- Solid SQL and PostgreSQL
+- Writing automated tests
+
+Nice to have:
+- Airflow or another workflow orchestrator
+- Docker
+- Experience evaluating ML or LLM output quality
+- A second South African language
+
+What you'll do: build internal AI tools for our operations team, from prototype to production.

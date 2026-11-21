@@ -1,0 +1,27 @@
+[project]
+name = "job-copilot"
+version = "0.1.0"
+description = "Job application copilot: fit scoring against your CV, grounded cover letters, application tracker."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.12.0",
+    "httpx>=0.28.1",
+    "pydantic>=2.14.4",
+    "python-dotenv>=1.2.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.29,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[project.scripts]
+jobs = "job_copilot.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

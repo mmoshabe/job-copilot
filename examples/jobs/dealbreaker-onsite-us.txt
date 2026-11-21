@@ -1,0 +1,12 @@
+Data Analyst: Lone Star Logistics (fictional)
+Location: Austin, Texas. On-site 5 days a week.
+
+Must be authorized to work in the United States without visa sponsorship. We are unable to sponsor visas for this role.
+
+Requirements:
+- 1+ years of SQL and Python for data analysis
+- Dashboarding in Power BI or Tableau
+- Strong communication skills
+
+Nice to have:
+- Logistics or supply-chain experience

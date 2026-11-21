@@ -1,0 +1,14 @@
+Senior Machine Learning Engineer: Savanna Health AI (fictional)
+Location: Remote (South Africa)
+
+Requirements:
+- 5+ years building production ML systems
+- Deep experience with PyTorch and model training
+- Kubernetes and cloud infrastructure (AWS)
+- Strong Python and SQL
+- Experience with LLMs and retrieval-augmented generation
+
+Advantageous:
+- MSc or PhD in a quantitative field
+- Healthcare data experience
+- Mentoring junior engineers

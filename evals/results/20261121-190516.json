@@ -1,0 +1,26 @@
+{
+  "summary": {
+    "model": "claude-opus-5-5",
+    "recommendation_accuracy": "1/1",
+    "fabricated_claims": 0,
+    "cost_usd": 0.2686
+  },
+  "cases": [
+    {
+      "case": "dealbreaker-onsite-us.txt",
+      "expected": "skip",
+      "got": "skip",
+      "ok": true,
+      "score": 36,
+      "dealbreakers": [
+        "Requires US work authorization without visa sponsorship; the CV shows the candidate is based in South Africa with no stated US authorization.",
+        "Requires on-site work in Austin, Texas 5 days a week; the candidate is in Johannesburg."
+      ],
+      "checker_unsupported": [],
+      "planted_found": [],
+      "letter_revisions": 2,
+      "letter_words": 270,
+      "letter": "Dear [Hiring Manager],\n\nLone Star Logistics needs a Data Analyst who can work in SQL and Python and turn the results into Power BI or Tableau dashboards. I build the data pipelines behind dashboards, and I have built Power BI reports myself. Now I want to move closer to the analysis side.\n\nI have 2 years' experience as a Python developer. As a Junior Data Engineer at Ubuntu Retail Analytics since February 2024, I built and maintain 12 Python ETL pipelines (Airflow, PostgreSQL) feeding the BI team's dashboards. I cut the nightly sales-report runtime from 3 hours to 40 minutes by rewriting SQL queries and adding indexes. I also wrote pytest suites that raised pipeline test coverage from 20% to 65%.\n\nFor dashboarding, my most direct experience comes from my internship at Khanya Insurance (July 2023 to January 2024). There I cleaned and analysed claims data in pandas and built Power BI reports for the claims team.\n\nMuch of my work is built for other teams. My pipelines feed the BI team's dashboards, my Power BI reports were built for the claims team, and an internal FastAPI service I built is used by 3 teams. I speak English, isiZulu and Sesotho.\n\nMy experience is in retail analytics and insurance rather than logistics, and I would be keen to learn your domain. I also want to be upfront: I am currently based in Johannesburg. I have read that this role requires US work authorization without sponsorship and five days a week on-site in Austin.\n\nI hold a BSc in Computer Science from the University of Johannesburg (2023).\n\nKind regards,\nLerato Dlamini"
+    }
+  ]
+}
