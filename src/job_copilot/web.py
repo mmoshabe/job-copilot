@@ -308,3 +308,39 @@ async def save_settings(request: Request):
     if d["expert_mode"] and d["run_budget_usd"] < 0.75:
         msg += " Note: expert mode needs about $0.75 per run to fit a panel review; at this budget it will do less."
     return _redirect("/settings", msg=msg)
+
+
+# -- master resumes (one per role family) ---------------------------------------------------
+
+from .resumes import FAMILIES, profile_key  # noqa: E402
+
+
+@app.get("/resumes", response_class=HTMLResponse)
+def resumes_page(request: Request):
+    t = copilot().t
+    masters = {f: {"label": label, "text": t.profile(profile_key(f)) or "", "at": t.profile_updated(profile_key(f))}
+               for f, label in FAMILIES.items()}
+    return templates.TemplateResponse(request, "resumes.html", _base(request, masters=masters))
+
+
+@app.get("/resumes/{family}/print", response_class=HTMLResponse)
+def print_master(request: Request, family: str):
+    if family not in FAMILIES:
+        return PlainTextResponse("not found", status_code=404)
+    return templates.TemplateResponse(request, "print.html", {"body": copilot().t.profile(profile_key(family)) or "Not uploaded yet."})
+
+
+@app.get("/resumes/{family}.md")
+def download_master(family: str):
+    if family not in FAMILIES:
+        return PlainTextResponse("not found", status_code=404)
+    return PlainTextResponse(copilot().t.profile(profile_key(family)) or "",
+                             headers={"Content-Disposition": f'attachment; filename="resume-{family}.md"'})
+
+
+@app.post("/resumes/{family}")
+def save_master(family: str, value: str = Form(...)):
+    if family not in FAMILIES:
+        return PlainTextResponse("not found", status_code=404)
+    copilot().t.set_profile(profile_key(family), value)
+    return _redirect("/resumes", msg=f"{FAMILIES[family]} master saved")

@@ -136,3 +136,14 @@ def test_expert_mode_setting(client):
     r = client.post("/settings", data=form, follow_redirects=False)
     assert web.automation.config(web.copilot()).expert_mode is True
     assert "expert+mode+needs" in r.headers["location"] or "expert%20mode" in r.headers["location"] or "needs+about" in r.headers["location"]
+
+
+def test_resumes_page(client):
+    login(client)
+    web.copilot().t.set_profile("resume_ai", "# Test Person\n**AI Implementation Specialist**")
+    page = client.get("/resumes").text
+    assert "AI roles" in page and "Not uploaded yet" in page  # other three missing
+    assert "AI Implementation Specialist" in client.get("/resumes/ai/print").text
+    client.post("/resumes/data", data={"value": "# Test Person\n**Data Analyst**"})
+    assert "Data Analyst" in client.get("/resumes/data.md").text
+    assert client.get("/resumes/bogus/print").status_code == 404

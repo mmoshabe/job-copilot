@@ -158,3 +158,25 @@ def test_business_role_keywords():
     terms = [k["term"] for k in keywords(job)]
     assert {"workflows", "ai agents", "no-code", "training", "non-technical", "business analysis", "operations",
             "process improvement"} <= set(terms)
+
+
+def test_family_detection():
+    from job_copilot.resumes import family_for
+    cases = {"AI Implementation Specialist": "ai", "Technical Support Engineer": "support", "Junior Data Analyst": "data",
+             "Full Stack Developer": "engineering", "BI Developer": "data", "Marketing Manager": None}
+    for title, fam in cases.items():
+        assert family_for(title) == fam, title
+
+
+def test_resume_starts_from_matching_master(c, monkeypatch):
+    seen = {}
+    import job_copilot.service as svc
+    real = svc.tailor_resume
+    def spy(*a, **kw):
+        seen.update(kw); return real(*a, **kw)
+    monkeypatch.setattr(svc, "tailor_resume", spy)
+    c.t.set_profile("resume_support", "# Test Person\\n**Technical Support Engineer**")
+    j = c.add_job(text=JOB).job_id   # FIT title is "Support Engineer"
+    c.resume(j)
+    assert seen["family"] == "support" and "Technical Support Engineer" in seen["master"]
+    assert c.t.doc(j, "resume")[1]["master"] == "support"

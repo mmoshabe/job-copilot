@@ -13,6 +13,7 @@ from .expert import interview_pack, review_panel
 from .config import Settings
 from .llm import LLM
 from .portfolio import evidence, export_portfolio, portfolio_markdown
+from .resumes import family_for, profile_key
 from .schemas import FitAssessment
 from .scoring import fit_score, recommendation
 from .sources import fetch_job
@@ -67,6 +68,11 @@ class Copilot:
                 return line.strip()
         return ""
 
+    def master_for(self, title: str, text: str = "") -> tuple[str | None, str | None]:
+        """(family, master resume text) for a job; (family, None) if that master isn't uploaded yet."""
+        family = family_for(title, text)
+        return family, (self.t.profile(profile_key(family)) if family else None)
+
     def sync_portfolio(self) -> int:
         md = portfolio_markdown(export_portfolio(self.s.portfolio_data))
         self.t.set_profile("portfolio", md)
@@ -101,12 +107,15 @@ class Copilot:
         if kind == "letter":
             res = write_letter(self.llm, self.s.model, ev, text, fit, self.s.max_letter_revisions, feedback=feedback)
         else:
+            family, master = self.master_for(fit.title, text)
             res = tailor_resume(self.llm, self.s.model, ev, text, fit, self.candidate_name(), self.s.max_letter_revisions,
-                                contact=self.candidate_contact(), ats_targets=ats_targets(text, ev, fit), feedback=feedback)
+                                contact=self.candidate_contact(), ats_targets=ats_targets(text, ev, fit), feedback=feedback,
+                                master=master, family=family)
         self.t.record_usage(kind, self.s.model, res.cost_usd, job_id)
         check = res.check.model_dump()
         if kind == "resume":
             check["changes"], check["gaps"] = res.doc.changes, res.doc.gaps
+            check["master"] = family if master else None
         self.t.save_doc(job_id, kind, res.text, check)
         if kind == "resume":
             self.t.save_json(job_id, "ats", ats_report(res.text, text, ev, fit, fit.title))

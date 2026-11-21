@@ -119,6 +119,11 @@ def main() -> None:
             projects = c.s.cv_path.parent / "projects.md"
             if projects.exists():
                 t.set_profile("projects", projects.read_text()); print(f"Projects uploaded from {projects}")
+            from .resumes import FAMILIES, profile_key
+            for fam in FAMILIES:
+                f = c.s.cv_path.parent / "resumes" / f"{fam}.md"
+                if f.exists():
+                    t.set_profile(profile_key(fam), f.read_text()); print(f"Master resume ({fam}) uploaded from {f}")
             try:
                 print(f"Portfolio synced ({c.sync_portfolio()} words) from {c.s.portfolio_data}")
             except (FileNotFoundError, OSError) as e:

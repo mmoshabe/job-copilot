@@ -131,8 +131,13 @@ def render_resume(r: TailoredResume, name: str = "", contact: str = "") -> str:
 
 def tailor_resume(llm: LLM, model: str, evidence: str, job: str, fit: FitAssessment, name: str = "",
                   max_revisions: int = 2, *, contact: str = "", ats_targets: list[str] | None = None,
-                  feedback: list[str] | None = None) -> DocResult:
+                  feedback: list[str] | None = None, master: str | None = None, family: str | None = None) -> DocResult:
     ctx = _ctx(evidence, job) + f"\n\n<assessment>\n{fit.model_dump_json(indent=1)}\n</assessment>"
+    if master:
+        ctx += (f"\n\n<master_resume family='{family}'>\nStart from this master resume: it is the candidate's own chosen "
+                "positioning for this kind of role (headline style, summary angle, what to emphasise and what to play down). "
+                "Keep that positioning unless the job clearly needs otherwise, then tailor it to this specific job. Every "
+                "statement must still be supported by the evidence above.\n" + master + "\n</master_resume>")
     if ats_targets:
         ctx += ("\n\n<ats_targets>\nApplicant tracking systems rank by literal keyword match. Each of these job keywords is "
                 "supported by the evidence: use each one, in this exact wording, where it is truthful (skills, bullets or "

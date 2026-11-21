@@ -39,6 +39,10 @@ LEXICON = [
     "low-code", "ai agents", "ai assistants", "chatbots", "training", "non-technical", "change management",
     "requirements gathering", "stakeholders", "sops", "client engagements", "small businesses", "nonprofits",
     "government", "user adoption", "project management", "consulting",
+    # data / analytics roles
+    "data analysis", "data analytics", "data visualization", "dashboards", "reporting", "kpis", "data modeling",
+    "data quality", "data governance", "data warehouse", "dax", "power query", "looker", "snowflake", "bigquery",
+    "dbt", "pandas", "statistics", "a/b testing", "data cleaning", "business intelligence", "excel",
 ]
 
 ALIASES = {
@@ -60,6 +64,10 @@ ALIASES = {
     "client engagements": ["client engagement", "client engagements"], "process improvement": ["process improvement", "process improvements"],
     "no-code": ["no-code", "no code", "nocode"], "low-code": ["low-code", "low code"],
     "government": ["government", "public sector"], "stakeholders": ["stakeholder", "stakeholders"],
+    "dashboards": ["dashboard", "dashboards"], "kpis": ["kpi", "kpis"], "reporting": ["reporting", "reports"],
+    "data visualization": ["data visualization", "data visualisation"], "data modeling": ["data modeling", "data modelling"],
+    "business intelligence": ["business intelligence", "bi"], "data cleaning": ["data cleaning", "data cleansing"],
+    "data analysis": ["data analysis", "analysing data", "analyzing data", "analysed", "analyzed"],
 }
 
 # "Make" (the automation tool) vs "make" (the verb): only count it capitalised in a tool-list context.

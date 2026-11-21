@@ -56,6 +56,7 @@
 <section class="card stack" id="resume" style="margin-top:16px">
   <div class="row" style="justify-content:space-between"><h2>Tailored resume</h2>
     <div class="row"><a class="btn ghost" href="/jobs/{{ j.id }}/resume/print" target="_blank">Print / save PDF</a><a class="btn ghost" href="/jobs/{{ j.id }}/resume.md">Download .md</a></div></div>
+  {% if resume_check.master %}<p class="muted small">Started from your <a href="/resumes">{{ resume_check.master }} master resume</a>, then tailored to this job.</p>{% endif %}
   {{ checkbox(resume_check) }}
   <div class="grid">
     {% if resume_check.changes %}<div><h3>What changed for this job</h3><ul>{% for c in resume_check.changes %}<li>{{ c }}</li>{% endfor %}</ul></div>{% endif %}

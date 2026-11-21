@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block body %}
+<p class="muted">Your four master resumes. Each job is matched to one by its title, and the tailored resume for that job starts from it. Editing here is optional; changes apply to the next resume the agent writes.</p>
+<div class="grid">
+{% for fam, m in masters.items() %}
+  <section class="card stack">
+    <div class="row" style="justify-content:space-between"><h2>{{ m.label }}</h2>
+      {% if m.text %}<div class="row"><a class="btn ghost" href="/resumes/{{ fam }}/print" target="_blank">Print / PDF</a><a class="btn ghost" href="/resumes/{{ fam }}.md">.md</a></div>{% endif %}</div>
+    {% if m.text %}
+      <span class="muted small">Updated {{ m.at }}</span>
+      <details><summary>Show</summary><div class="doc">{{ m.text | md | safe }}</div></details>
+      <details><summary>Edit (optional)</summary><form method="post" action="/resumes/{{ fam }}" class="stack"><textarea name="value" style="min-height:360px">{{ m.text }}</textarea><button>Save</button></form></details>
+    {% else %}<p class="muted">Not uploaded yet: run <code>uv run jobs profile push</code>.</p>{% endif %}
+  </section>
+{% endfor %}
+</div>
+{% endblock %}
